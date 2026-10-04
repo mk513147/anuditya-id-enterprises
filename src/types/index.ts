@@ -1,0 +1,122 @@
+/** Domain types. Mock services and a future Supabase layer both return these. */
+
+export type ID = string
+export type ISODate = string
+
+export interface Student {
+  id: ID
+  referenceNo: string // e.g. ANU-2026-00001
+  name: string
+  fatherName: string
+  motherName: string
+  dob: ISODate
+  className: string
+  section: string
+  rollNo: string
+  admissionNo: string
+  address: string
+  mobile: string
+  photoUrl?: string
+  school?: string
+  submittedAt: ISODate
+}
+
+/** What the UI submits. The photo is required; the repository decides how to store it. */
+export type StudentSubmission = Omit<Student, 'id' | 'referenceNo' | 'submittedAt' | 'photoUrl'> & { photo: File }
+
+export interface StudentSubmissionResult {
+  referenceNo: string
+  submittedAt: ISODate
+}
+
+export const ORDER_STATUSES = [
+  'Order Received',
+  'Data Verification',
+  'Designing',
+  'Printing',
+  'Quality Check',
+  'Ready',
+  'Dispatched',
+  'Delivered',
+] as const
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
+
+export interface Order {
+  id: ID
+  orderNo: string
+  customer: string // customer / school
+  service: string
+  quantity: number
+  status: OrderStatus
+  orderDate: ISODate
+  expectedDelivery: ISODate
+  notes?: string
+}
+
+export type UploadedFileType = 'xlsx' | 'xls' | 'csv'
+
+/** Stored file metadata (what a database row / storage object would hold). */
+export interface UploadedFile {
+  id: ID
+  referenceNo: string // e.g. FILE-2026-00001
+  originalName: string
+  /** Internal storage location. Never shown to users. */
+  storagePath: string
+  type: UploadedFileType
+  sizeBytes: number
+  uploadedAt: ISODate
+  /** School / customer, when known (not collected on the public upload page). */
+  customer?: string
+}
+
+/** What the public UI receives after an upload: no internal storage details. */
+export type FileUploadResult = Pick<UploadedFile, 'referenceNo' | 'originalName' | 'type' | 'sizeBytes' | 'uploadedAt'>
+
+export type ServiceCategory = 'id-cards' | 'school-materials' | 'design-printing'
+
+export interface Service {
+  id: ID
+  slug: string
+  title: string
+  /** Short card subtitle, e.g. "Student & Staff" */
+  tagline: string
+  category: ServiceCategory
+  description: string
+  /** Real photo URL. When empty the UI renders a branded placeholder. */
+  image?: string
+  /** Key into the placeholder icon map (see lib/icons.ts) */
+  icon: string
+  enabled: boolean
+  order: number
+}
+
+export interface Advertisement {
+  id: ID
+  title: string
+  description: string
+  offer?: string
+  /** Real banner URL. When empty the UI renders a branded placeholder. */
+  image?: string
+  icon: string
+  whatsappMessage: string
+  active: boolean
+  featured: boolean
+}
+
+export type FeedbackStatus = 'pending' | 'approved' | 'rejected'
+export interface Feedback {
+  id: ID
+  name: string
+  organization: string
+  rating: 1 | 2 | 3 | 4 | 5
+  message: string
+  status: FeedbackStatus
+  createdAt: ISODate
+}
+
+export interface PagedResult<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
+}

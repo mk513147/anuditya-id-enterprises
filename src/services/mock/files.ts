@@ -2,9 +2,7 @@ import { delay } from '@/lib/delay'
 import type { UploadedFile, UploadedFileType } from '@/types'
 import { getExtension } from '@/validations/upload'
 import type { FileRepository } from '../types'
-
-/** In-memory only. Cleared on page refresh; nothing is stored permanently. */
-const uploads: UploadedFile[] = []
+import { db, pad5 } from './db'
 
 /**
  * Prototype hook for testing the error state: upload any file whose name contains "FAIL"
@@ -12,8 +10,6 @@ const uploads: UploadedFile[] = []
  * A real repository would reject the same way on a storage/network error.
  */
 export const MOCK_FAILURE_FILENAME_TOKEN = 'FAIL'
-
-const pad = (n: number) => String(n).padStart(5, '0')
 
 export const mockFileRepository: FileRepository = {
   async upload(file, { onProgress }) {
@@ -31,7 +27,7 @@ export const mockFileRepository: FileRepository = {
     await delay(250) // "processing" after the last byte
 
     const now = new Date()
-    const referenceNo = `FILE-${now.getFullYear()}-${pad(uploads.length + 1)}`
+    const referenceNo = `FILE-${now.getFullYear()}-${pad5(db.files.length + 1)}`
     const record: UploadedFile = {
       id: crypto.randomUUID(),
       referenceNo,
@@ -41,7 +37,7 @@ export const mockFileRepository: FileRepository = {
       sizeBytes: file.size,
       uploadedAt: now.toISOString(),
     }
-    uploads.push(record) // the file's bytes are not kept in the prototype
+    db.files.push(record) // the file's bytes are not kept in the prototype
 
     return {
       referenceNo: record.referenceNo,

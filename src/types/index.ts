@@ -3,9 +3,30 @@
 export type ID = string
 export type ISODate = string
 
+export interface School {
+  id: ID
+  name: string
+  /** URL-safe identifier used in the public link: /school/:slug. Unique. NOT a security mechanism. */
+  slug: string
+  /** Short internal code, e.g. STM-001. Unique. */
+  code: string
+  contactPerson: string
+  phone: string
+  email?: string
+  address?: string
+  isActive: boolean
+  createdAt: ISODate
+  updatedAt: ISODate
+}
+
+/** Editable school fields (everything the admin form controls). */
+export type SchoolInput = Pick<School, 'name' | 'slug' | 'code' | 'contactPerson' | 'phone' | 'email' | 'address'>
+
 export interface Student {
   id: ID
   referenceNo: string // e.g. ANU-2026-00001
+  /** Owning school. Explicit relationship by ID. */
+  schoolId: ID
   name: string
   fatherName: string
   motherName: string
@@ -17,16 +38,36 @@ export interface Student {
   address: string
   mobile: string
   photoUrl?: string
-  school?: string
+  // Optional details (not yet confirmed as mandatory by the client)
+  bloodGroup?: string
+  houseName?: string
+  houseColour?: string
+  busRoute?: string
+  busStoppage?: string
   submittedAt: ISODate
+  updatedAt: ISODate
+  /**
+   * Soft-archive flag. Students are never permanently deleted: an archived student leaves the default
+   * list but keeps its record, reference number and school association (and any history that points at it).
+   */
+  isArchived: boolean
+  archivedAt?: ISODate
 }
 
+/** The fields an admin may edit. School and reference number are deliberately NOT editable. */
+export type StudentEditInput = Pick<
+  Student,
+  | 'name' | 'fatherName' | 'motherName' | 'dob' | 'className' | 'section' | 'rollNo' | 'admissionNo' | 'address' | 'mobile'
+  | 'bloodGroup' | 'houseName' | 'houseColour' | 'busRoute' | 'busStoppage'
+>
+
 /** What the UI submits. The photo is required; the repository decides how to store it. */
-export type StudentSubmission = Omit<Student, 'id' | 'referenceNo' | 'submittedAt' | 'photoUrl'> & { photo: File }
+export type StudentSubmission = Omit<Student, 'id' | 'referenceNo' | 'submittedAt' | 'updatedAt' | 'isArchived' | 'archivedAt' | 'photoUrl'> & { photo: File }
 
 export interface StudentSubmissionResult {
   referenceNo: string
   submittedAt: ISODate
+  schoolName: string
 }
 
 export const ORDER_STATUSES = [
@@ -44,7 +85,9 @@ export type OrderStatus = (typeof ORDER_STATUSES)[number]
 export interface Order {
   id: ID
   orderNo: string
-  customer: string // customer / school
+  /** Owning school, when the order belongs to one. */
+  schoolId?: ID
+  customer: string // customer / school name (display)
   service: string
   quantity: number
   status: OrderStatus
@@ -66,6 +109,7 @@ export interface UploadedFile {
   sizeBytes: number
   uploadedAt: ISODate
   /** School / customer, when known (not collected on the public upload page). */
+  schoolId?: ID
   customer?: string
 }
 

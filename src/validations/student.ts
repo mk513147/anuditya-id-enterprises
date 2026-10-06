@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { StudentEditInput } from '@/types'
 
 export const PHOTO_MAX_BYTES = 2 * 1024 * 1024 // prototype limit; adjust for production
 export const PHOTO_ACCEPT = 'image/jpeg,image/png,.jpg,.jpeg,.png'
@@ -10,6 +11,8 @@ export const CLASS_OPTIONS = [
   ...Array.from({ length: 12 }, (_, i) => `Class ${i + 1}`),
   'Other',
 ] as const
+
+export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const
 
 /** Today as YYYY-MM-DD (local time). Used as the max for the date input. */
 export const todayISO = () => {
@@ -36,6 +39,14 @@ export function normalizeMobile(raw: string): string {
   return v
 }
 
+/** Optional free text: empty is fine; otherwise limited length and no exotic characters. */
+const optionalText = (label: string, max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max, `${label} must be ${max} characters or fewer.`)
+    .regex(/^[\p{L}\p{N} .,'/()#&-]*$/u, `${label} contains characters that are not allowed.`)
+
 const nameField = (label: string) =>
   z
     .string()
@@ -53,6 +64,7 @@ const idField = (label: string, max: number) =>
     .regex(/^[A-Za-z0-9/-]+$/, `${label} can contain only letters, numbers, / and -.`)
 
 export const studentSchema = z.object({
+  schoolId: z.string().min(1, 'Please select your school.'),
   name: nameField('Student name'),
   fatherName: nameField("Father's name"),
   motherName: nameField("Mother's name"),
@@ -80,6 +92,14 @@ export const studentSchema = z.object({
     .trim()
     .min(1, 'Mobile number is required.')
     .refine((v) => /^[6-9]\d{9}$/.test(normalizeMobile(v)), 'Please enter a valid 10-digit mobile number.'),
+  // Optional until the client confirms which of these are mandatory.
+  bloodGroup: z
+    .string()
+    .refine((v) => v === '' || (BLOOD_GROUPS as readonly string[]).includes(v), 'Please choose a blood group from the list.'),
+  houseName: optionalText('House name', 40),
+  houseColour: optionalText('House colour', 30),
+  busRoute: optionalText('Bus route', 40),
+  busStoppage: optionalText('Bus stoppage', 60),
   photo: z
     .custom<File>((v) => v instanceof File, { message: 'Please upload the student photo.' })
     .superRefine((file, ctx) => {
@@ -89,3 +109,32 @@ export const studentSchema = z.object({
 })
 
 export type StudentFormValues = z.infer<typeof studentSchema>
+
+/** Admin edit form: every public-form rule except the photo and the school (neither is editable here). */
+export const studentEditSchema = studentSchema.omit({ photo: true, schoolId: true })
+export type StudentEditFormValues = z.infer<typeof studentEditSchema>
+
+/**
+ * Turns validated form values into repository input: upper-cases the section, strips +91/0 from the
+ * mobile and maps empty optional fields to undefined. Shared by the public form and the admin editor
+ * so the two can never normalise differently.
+ */
+export function toStudentFields(v: StudentEditFormValues): StudentEditInput {
+  return {
+    name: v.name,
+    fatherName: v.fatherName,
+    motherName: v.motherName,
+    dob: v.dob,
+    className: v.className,
+    section: v.section.toUpperCase(),
+    rollNo: v.rollNo,
+    admissionNo: v.admissionNo,
+    address: v.address,
+    mobile: normalizeMobile(v.mobile),
+    bloodGroup: v.bloodGroup || undefined,
+    houseName: v.houseName || undefined,
+    houseColour: v.houseColour || undefined,
+    busRoute: v.busRoute || undefined,
+    busStoppage: v.busStoppage || undefined,
+  }
+}

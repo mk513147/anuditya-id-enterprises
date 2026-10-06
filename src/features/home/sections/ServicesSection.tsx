@@ -29,7 +29,7 @@ export function ServicesSection() {
         {isError ? (
           <ErrorState onRetry={() => refetch()} />
         ) : isPending ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4" aria-busy="true" aria-label="Loading services">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4" aria-busy="true" aria-label="Loading services">
             {Array.from({ length: 8 }, (_, i) => (
               <SkeletonBlock key={i} className="h-64" />
             ))}
@@ -37,7 +37,7 @@ export function ServicesSection() {
         ) : data.length === 0 ? (
           <EmptyState title="No services available" text="Please check back soon." />
         ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+          <ul className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
             {data.map((s, i) => (
               <li key={s.id}>
                 <Reveal delay={(i % 4) * 0.05} y={16} className="h-full">

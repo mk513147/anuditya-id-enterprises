@@ -55,7 +55,7 @@ export function ServiceCard({ service, index = 0, variant = 'compact' }: Props) 
           {service.description}
         </p>
         <div className={cn('flex items-center gap-2', detailed ? 'mt-4' : 'mt-3')}>
-          <Button size="sm" className="h-11 flex-1" onClick={() => openQuote(service.title)}>
+          <Button size="sm" className="h-11 min-w-0 flex-1 px-2 sm:px-3" onClick={() => openQuote(service.title)}>
             Get Quote
           </Button>
           {detailed ? (

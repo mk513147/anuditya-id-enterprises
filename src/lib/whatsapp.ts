@@ -8,8 +8,8 @@ export const waMessages = {
   quote: (service: string) =>
     `${GREETING}I am interested in ${service} printing. Please provide a quotation.`,
   order: (ref: string) => `${GREETING}I would like an update on order ${ref}.`,
-  studentForm: (ref: string) =>
-    `${GREETING}I have submitted the student form. My reference number is ${ref}.`,
+  studentForm: (ref: string, school?: string) =>
+    `${GREETING}I have submitted the student form${school ? ` for ${school}` : ""}. My reference number is ${ref}.`,
   fileUploadHelp: () => `${GREETING}I need help uploading my student data file.`,
   fileUploaded: (ref: string) =>
     `${GREETING}I have uploaded my student data file. My upload reference is ${ref}.`,

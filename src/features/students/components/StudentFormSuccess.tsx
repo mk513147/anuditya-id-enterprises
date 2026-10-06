@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { copyText } from '@/lib/clipboard'
 import { waMessages } from '@/lib/whatsapp'
 
-export function StudentFormSuccess({ referenceNo, onReset }: { referenceNo: string; onReset: () => void }) {
+export function StudentFormSuccess({ referenceNo, schoolName, onReset }: { referenceNo: string; schoolName?: string; onReset: () => void }) {
   const reduce = useReducedMotion()
   const [copied, setCopied] = useState(false)
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -56,6 +56,11 @@ export function StudentFormSuccess({ referenceNo, onReset }: { referenceNo: stri
           <p className="mx-auto mt-2 w-fit max-w-full rounded-2xl border-2 border-dashed border-royal-500/40 bg-royal-50 px-5 py-3 font-display text-2xl font-extrabold tracking-wide text-navy-900 sm:text-3xl">
             <span className="break-all">{referenceNo}</span>
           </p>
+          {schoolName && (
+            <p className="mt-3 text-sm text-ink" data-testid="success-school">
+              School: <strong className="text-navy-900">{schoolName}</strong>
+            </p>
+          )}
           <p className="mt-2 text-sm text-muted-ink">Keep this number. You can use it to check your job status.</p>
         </div>
 
@@ -64,7 +69,7 @@ export function StudentFormSuccess({ referenceNo, onReset }: { referenceNo: stri
             {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
             {copied ? 'Copied' : 'Copy Reference Number'}
           </Button>
-          <WhatsAppButton size="lg" label="WhatsApp Us" message={waMessages.studentForm(referenceNo)} />
+          <WhatsAppButton size="lg" label="WhatsApp Us" message={waMessages.studentForm(referenceNo, schoolName)} />
           <Button size="lg" variant="outline" onClick={onReset}>
             <RotateCcw aria-hidden /> Submit Another Form
           </Button>

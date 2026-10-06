@@ -1,5 +1,5 @@
 import {
-  BookOpen, BookText, Camera, FilePenLine, Flag, GraduationCap, Headset, IdCard, IndianRupee, Newspaper, PenLine,
+  BookOpen, BookText, Bus, Camera, FilePenLine, Flag, GraduationCap, Headset, IdCard, FolderOpen, LayoutDashboard, Megaphone, MessageSquare, ClipboardList, Settings, IndianRupee, Newspaper, PenLine,
   PenTool, Phone, Printer, Receipt, School, Search, ShieldCheck, Tag, ThumbsUp, Timer, Truck, Upload, User, Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -9,6 +9,13 @@ const ICONS: Record<string, LucideIcon> = {
   'id-card': IdCard,
   users: Users,
   user: User,
+  dashboard: LayoutDashboard,
+  orders: ClipboardList,
+  files: FolderOpen,
+  megaphone: Megaphone,
+  message: MessageSquare,
+  settings: Settings,
+  bus: Bus,
   phone: Phone,
   camera: Camera,
   school: School,

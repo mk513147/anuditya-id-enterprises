@@ -19,12 +19,18 @@ export const FOOTER_LINKS: NavItem[] = [
   { label: 'Contact', to: '/#contact' },
 ]
 
-export const ADMIN_NAV: NavItem[] = [
-  { label: 'Dashboard', to: '/admin' },
-  { label: 'Students', to: '/admin/students' },
-  { label: 'Orders', to: '/admin/orders' },
-  { label: 'Files', to: '/admin/files' },
-  { label: 'Advertisements', to: '/admin/advertisements' },
-  { label: 'Feedback', to: '/admin/feedback' },
-  { label: 'Services', to: '/admin/services' },
+export interface AdminNavItem extends NavItem {
+  /** Key into lib/icons.ts */
+  icon: string
+}
+
+export const ADMIN_NAV: AdminNavItem[] = [
+  { label: 'Dashboard', to: '/admin', icon: 'dashboard' },
+  { label: 'Schools', to: '/admin/schools', icon: 'school' },
+  { label: 'Students', to: '/admin/students', icon: 'users' },
+  { label: 'Orders', to: '/admin/orders', icon: 'orders' },
+  { label: 'Files', to: '/admin/files', icon: 'files' },
+  { label: 'Advertisements', to: '/admin/advertisements', icon: 'megaphone' },
+  { label: 'Feedback', to: '/admin/feedback', icon: 'message' },
+  { label: 'Services', to: '/admin/services', icon: 'settings' },
 ]

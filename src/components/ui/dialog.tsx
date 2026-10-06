@@ -51,10 +51,16 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // Radix only restores focus to a <DialogTrigger>. Most dialogs in this app are opened from state
+  // (row actions, buttons), so remember what had focus when we opened and return there on close.
+  const returnFocusTo = React.useRef<HTMLElement | null>(null)
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -64,6 +70,18 @@ function DialogContent({
           "fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border bg-background p-6 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
           className
         )}
+        onOpenAutoFocus={(event) => {
+          returnFocusTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+          onOpenAutoFocus?.(event)
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          if (event.defaultPrevented && !returnFocusTo.current) return
+          event.preventDefault()
+          // If the opener is gone (e.g. its row was archived), fall back to the page content.
+          const target = returnFocusTo.current?.isConnected ? returnFocusTo.current : document.querySelector<HTMLElement>('main')
+          target?.focus()
+        }}
         {...props}
       >
         {children}

@@ -1,4 +1,4 @@
-import type { Advertisement, FileUploadResult, Feedback, ID, Order, PagedResult, School, SchoolInput, Service, Student, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
+import type { Advertisement, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
 
 /**
  * Repository contracts. The UI depends only on these interfaces;
@@ -10,13 +10,27 @@ export interface ServiceRepository {
 }
 
 export interface AdvertisementRepository {
-  /** Active advertisements only. */
-  listPublic(): Promise<Advertisement[]>
+  /**
+   * Advertisements the public may see right now: enabled, published, started and not expired.
+   * `now` is injectable so the rule can be tested at fixed instants.
+   */
+  listPublic(now?: Date): Promise<Advertisement[]>
 }
 
 export interface FeedbackRepository {
-  /** Approved feedback only. */
+  /** Approved feedback only, newest first. Pending and rejected feedback never leave the data layer. */
   listApproved(): Promise<Feedback[]>
+  /** Stores new feedback as PENDING approval. Rejects on failure and then stores nothing. */
+  submit(input: FeedbackInput): Promise<FeedbackSubmissionResult>
+}
+
+export interface OrderRepository {
+  /**
+   * Public order lookup by exact job / order number (case-insensitive, whitespace tolerant).
+   * Returns null when nothing matches; never a partial or fuzzy match. Returns a whitelisted
+   * PublicOrder, never the stored Order. Rejects on failure.
+   */
+  findByReference(reference: string): Promise<PublicOrder | null>
 }
 
 /** A student joined with its school's display fields, so lists never match schools by name. */

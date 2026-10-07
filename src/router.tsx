@@ -3,6 +3,9 @@ import { AdminLayout } from '@/layouts/AdminLayout'
 import { PublicLayout } from '@/layouts/PublicLayout'
 import { HomePage } from '@/pages/HomePage'
 import { FileUploadPage } from '@/pages/FileUploadPage'
+import { JobStatusPage } from '@/pages/JobStatusPage'
+import { AdvertisementPage } from '@/pages/AdvertisementPage'
+import { FeedbackPage } from '@/pages/FeedbackPage'
 import { StudentFormPage } from '@/pages/StudentFormPage'
 import { SchoolSubmissionPage } from '@/pages/SchoolSubmissionPage'
 import { ServicesPage } from '@/pages/ServicesPage'
@@ -28,10 +31,10 @@ export const router = createBrowserRouter([
       // Direct visits need the host's SPA fallback; see docs/school-links.md.
       { path: '/school/:schoolSlug', element: <SchoolSubmissionPage /> },
       { path: '/file-upload', element: <FileUploadPage /> },
-      { path: '/job-status', element: page('Job Status') },
+      { path: '/job-status', element: <JobStatusPage /> },
       { path: '/services', element: <ServicesPage /> },
-      { path: '/advertisement', element: page('Advertisement') },
-      { path: '/feedback', element: page('Feedback') },
+      { path: '/advertisement', element: <AdvertisementPage /> },
+      { path: '/feedback', element: <FeedbackPage /> },
       { path: '/login', element: page('Login') },
       { path: '*', element: <NotFoundPage /> },
     ],

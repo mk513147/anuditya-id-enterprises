@@ -93,8 +93,15 @@ export interface Order {
   status: OrderStatus
   orderDate: ISODate
   expectedDelivery: ISODate
+  /** Internal notes. Never exposed by the public tracking lookup. */
   notes?: string
 }
+
+/**
+ * What the public Job Status page may see. Deliberately a whitelist: no id, school id, internal notes
+ * or contact details. (Orders have no cancellation concept yet, so there is no cancelled state.)
+ */
+export type PublicOrder = Pick<Order, 'orderNo' | 'customer' | 'service' | 'quantity' | 'status' | 'orderDate' | 'expectedDelivery'>
 
 export type UploadedFileType = 'xlsx' | 'xls' | 'csv'
 
@@ -143,7 +150,13 @@ export interface Advertisement {
   image?: string
   icon: string
   whatsappMessage: string
+  /** Enabled by an admin. A disabled advertisement is never public. */
   active: boolean
+  /** false = draft. Drafts are never public, whatever their dates. */
+  isPublished: boolean
+  /** Optional visibility window. Outside it (not started / expired) the advertisement is hidden. */
+  startsAt?: ISODate
+  endsAt?: ISODate
   featured: boolean
 }
 
@@ -151,11 +164,19 @@ export type FeedbackStatus = 'pending' | 'approved' | 'rejected'
 export interface Feedback {
   id: ID
   name: string
-  organization: string
+  organization?: string
   rating: 1 | 2 | 3 | 4 | 5
   message: string
   status: FeedbackStatus
   createdAt: ISODate
+}
+
+/** What the public feedback form submits. New feedback is always stored as pending approval. */
+export type FeedbackInput = Pick<Feedback, 'name' | 'organization' | 'rating' | 'message'>
+
+export interface FeedbackSubmissionResult {
+  id: ID
+  status: 'pending'
 }
 
 export interface PagedResult<T> {

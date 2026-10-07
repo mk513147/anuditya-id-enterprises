@@ -10,4 +10,5 @@ export const ORDERS_DATA: Order[] = [
   { id: 'ord-6', orderNo: 'JOB-2026-0006', schoolId: 'sch-greenvalley', customer: 'Green Valley College', service: 'Prospectus', quantity: 1000, status: 'Data Verification', orderDate: '2026-09-28', expectedDelivery: '2026-10-25' },
   { id: 'ord-7', orderNo: 'JOB-2026-0007', schoolId: 'sch-lotus', customer: 'Lotus International School', service: 'Magazine', quantity: 400, status: 'Order Received', orderDate: '2026-10-02', expectedDelivery: '2026-11-05' },
   { id: 'ord-8', orderNo: 'JOB-2026-0008', schoolId: 'sch-sunrise', customer: 'Sunrise Public School', service: 'Staff ID Card', quantity: 60, status: 'Ready', orderDate: '2026-09-22', expectedDelivery: '2026-10-07' },
+  { id: 'ord-9', orderNo: 'JOB-2026-0009', schoolId: 'sch-stmarys', customer: "St. Mary's School", service: 'Group Photo', quantity: 120, status: 'Dispatched', orderDate: '2026-08-18', expectedDelivery: '2026-10-09', notes: 'Internal: courier AWB pending (never shown publicly).' },
 ]

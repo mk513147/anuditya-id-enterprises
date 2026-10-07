@@ -15,7 +15,7 @@ export function TestimonialCard({ feedback }: { feedback: Feedback }) {
         </span>
         <span className="min-w-0">
           <span className="block truncate text-sm font-bold text-navy-900">{feedback.name}</span>
-          <span className="block truncate text-xs text-muted-ink">{feedback.organization}</span>
+          {feedback.organization && <span className="block truncate text-xs text-muted-ink">{feedback.organization}</span>}
         </span>
       </figcaption>
     </figure>

@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { AdminNav } from '@/components/admin/AdminNav'
+import { DataSourceNotice } from '@/components/shared/DataSourceNotice'
 import { Logo } from '@/components/shared/Logo'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { useAuth } from '@/features/auth/useAuth'
 import { BUSINESS } from '@/lib/business'
+import { dataSource } from '@/services'
 import { useRouteTitle } from './routeHandle'
 
 function AdminBrand() {
@@ -91,9 +93,12 @@ export function AdminLayout() {
           </div>
         </header>
 
+        <DataSourceNotice />
         <main id="admin-main" tabIndex={-1} className="flex-1 p-4 outline-none sm:p-6 lg:p-8">
           <Outlet />
-          <p className="mt-10 text-center text-xs text-muted-ink">{BUSINESS.name} · Admin prototype · data shown is demo data held in memory</p>
+          <p className="mt-10 text-center text-xs text-muted-ink">
+            {BUSINESS.name} · Admin · {dataSource === 'mock' ? 'demo data held in memory' : 'live data'}
+          </p>
         </main>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { SiteFooter } from '@/components/layout/SiteFooter'
 import { SiteHeader } from '@/components/layout/SiteHeader'
+import { DataSourceNotice } from '@/components/shared/DataSourceNotice'
 import { PageTransition } from '@/components/shared/PageTransition'
 import { ScrollToTop } from '@/components/shared/ScrollToTop'
 
@@ -15,6 +16,7 @@ export function PublicLayout() {
         Skip to content
       </a>
       <ScrollToTop />
+      <DataSourceNotice />
       <SiteHeader />
       <main id="main" tabIndex={-1} className="flex-1 outline-none">
         <PageTransition key={pathname}>

@@ -7,6 +7,7 @@ import { FeedbackForm } from '@/features/feedback/FeedbackForm'
 import { FeedbackThanks } from '@/features/feedback/FeedbackThanks'
 import { useApprovedFeedback } from '@/features/feedback/hooks'
 import { TestimonialList } from '@/features/feedback/TestimonialList'
+import { dataSource } from '@/services'
 import { usePageTitle } from '@/hooks/usePageTitle'
 
 export function FeedbackPage() {
@@ -49,7 +50,7 @@ export function FeedbackPage() {
 
       <section aria-labelledby="fb-testimonials" className="bg-surface">
         <div className="container-page section-y">
-          <SectionHeading id="fb-testimonials" eyebrow="Testimonials" title="What schools and colleges say" description="Sample feedback shown for this prototype." />
+          <SectionHeading id="fb-testimonials" eyebrow="Testimonials" title="What schools and colleges say" description={dataSource === 'mock' ? 'Sample feedback shown for this demo.' : 'Approved feedback from the schools and colleges we work with.'} />
           <TestimonialList state={isError ? 'error' : isPending ? 'loading' : 'ready'} items={data} onRetry={() => void refetch()} />
         </div>
       </section>

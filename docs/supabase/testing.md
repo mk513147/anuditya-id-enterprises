@@ -1,6 +1,7 @@
 # Database security tests
 
-Seven pgTAP-style test files in `supabase/tests/database/` with 274 assertions in total (28 + 28 + 37 + 51 + 52 + 36 + 42).
+Eight pgTAP-style test files in `supabase/tests/database/` with 315 assertions in total (28 + 28 + 37 + 51 + 52 + 36 + 42 + 41).
+`07_phase3_uploads_and_summary.test.sql` covers migration 13 (insert-only uploads, photo/file registration, `admin_summary`).
 Each file runs inside `begin; … rollback;`, creates only fictional fixtures and leaves nothing behind.
 
 | File | Covers |
@@ -41,7 +42,7 @@ all seven test files were executed in an in-memory PostgreSQL emulator (PGlite) 
   and `storage.buckets`/`storage.objects` with RLS on;
 - supplies a tiny pgTAP-compatible set of functions (`plan`, `ok`, `is`, `isnt`, `throws_ok`, `lives_ok`, `is_empty`, `finish`).
 
-Results of that run: all 12 migrations apply in order, `seed.sql` loads, **274 assertions pass, 0 fail**.
+Results of the latest run (Phase 3): all 13 migrations apply in order, `seed.sql` loads, **315 assertions pass, 0 fail**.
 **Mutation check:** seven deliberate weakenings (anon `SELECT` on students, RLS disabled on orders, anon execute on an admin
 function, tracking that ignores the code, public bucket, an anon storage policy, update grant on the approval column) were
 each caught by at least one test.
@@ -56,7 +57,7 @@ local Supabase stack before relying on it.
 `supabase/provisioning/01_preflight_read_only.sql`, `02_provision_administrator.sql` and `03_verify_administrator.sql` (procedure:
 `admin-provisioning.md`) are tested in two ways. **Neither has been run against the hosted project.**
 
-- **Executable, in the PostgreSQL emulator:** `supabase/verification/emulator/provisioning.test.mjs` runs the real SQL files against the 12
+- **Executable, in the PostgreSQL emulator:** `supabase/verification/emulator/provisioning.test.mjs` runs the real SQL files against the 13
   migrations: **126 checks**. They cover zero and multiple Auth users, a wrong UID, a wrong intended email, unconfirmed/soft-deleted/banned/anonymous/SSO
   users, a missing/extra migration version, an absent history table, a missing index, trigger or policy, RLS off, incorrect or column-level grants,
   a missing administrator (FAIL, not "no rows"), `auth.users` columns that a project does not expose (INCONCLUSIVE, never assumed), the preview and
@@ -64,7 +65,7 @@ local Supabase stack before relying on it.
   the scripts makes the tests fail (checked). Run it with `npm install --no-save @electric-sql/pglite` (not a project dependency), then
   `node supabase/verification/emulator/provisioning.test.mjs` (set `PGLITE_ROOT` if the package is installed elsewhere). Its `prelude.sql` stands in
   for Supabase's `auth`, `storage` and migration-history tables, so it proves the SQL logic and **not** hosted Supabase behaviour.
-- **Static, in the application test suite:** `src/features/auth/provisioning.static.test.ts` keeps the 12 versions listed in `01` identical to
+- **Static, in the application test suite:** `src/features/auth/provisioning.static.test.ts` keeps the 13 versions listed in `01` identical to
   `supabase/migrations/`, checks that `01` and `03` are one read-only `SELECT`, that `02` defaults to a preview and uses only the existing owner-only
   function, that no UID, email, password or key is committed, and that `admin-provisioning.md` still documents every required point.
 

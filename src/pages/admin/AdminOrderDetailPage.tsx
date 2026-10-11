@@ -4,9 +4,10 @@ import { ErrorState, SkeletonBlock } from '@/components/shared/QueryState'
 import { Button } from '@/components/ui/button'
 import { OrderDetailView } from '@/features/orders/admin/OrderDetailView'
 import { OrderStatusUpdater } from '@/features/orders/admin/OrderStatusUpdater'
+import { TrackingCodeRotator } from '@/features/orders/admin/TrackingCodeRotator'
 import { useAdminOrder } from '@/features/orders/hooks'
 import { usePageTitle } from '@/hooks/usePageTitle'
-import { isRepositoryError } from '@/services/errors'
+import { describeError, isRepositoryError } from '@/services/errors'
 
 export function AdminOrderDetailPage() {
   const { orderId = '' } = useParams()
@@ -38,7 +39,7 @@ export function AdminOrderDetailPage() {
       <>
         {back}
         <ErrorState
-          message={missing ? 'This order could not be found. The link may be wrong or the order may no longer exist.' : 'Could not load this order.'}
+          message={missing ? 'This order could not be found. The link may be wrong or the order may no longer exist.' : describeError(error, 'Could not load this order.')}
           onRetry={missing ? undefined : () => void refetch()}
         />
       </>
@@ -49,6 +50,9 @@ export function AdminOrderDetailPage() {
     <>
       {back}
       <OrderDetailView order={data} updater={<OrderStatusUpdater key={data.status} order={data} />} />
+      <div className="mt-6">
+        <TrackingCodeRotator key={data.id} order={data} />
+      </div>
     </>
   )
 }

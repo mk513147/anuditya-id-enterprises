@@ -30,9 +30,16 @@ describe('trackOrderSchema', () => {
     expect(r.success).toBe(false)
     expect(r.error?.issues[0].message).toContain('JOB-2026-0003')
   })
-  it('accepts a valid reference', () => {
-    expect(trackOrderSchema.safeParse({ reference: ' job-2026-0003 ' }).success).toBe(true)
+  it('accepts a valid reference with a well-formed tracking code', () => {
+    expect(trackOrderSchema.safeParse({ reference: ' job-2026-0003 ', trackingCode: 'abcde-fghjk-lmnpq-rstuv-wxyz2' }).success).toBe(true)
   })
+  it('requires the tracking code: the order number alone is never enough', () => {
+    const r = trackOrderSchema.safeParse({ reference: 'JOB-2026-0003', trackingCode: '' })
+    expect(r.success).toBe(false)
+    expect(r.error?.issues.map((i) => i.path[0])).toEqual(['trackingCode'])
+  })
+  it.each(['ABCDE', 'ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ', 'ABCDE-FGHJK-LMNPQ-RSTUV-WXYZ0', '<script>alert(1)</script>'])('rejects the malformed code %j', (code) =>
+    expect(trackOrderSchema.safeParse({ reference: 'JOB-2026-0003', trackingCode: code }).success).toBe(false))
 })
 
 describe('buildTimeline', () => {

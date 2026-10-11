@@ -78,7 +78,7 @@ function ServiceForm({ service, onClose }: { service?: Service; onClose: () => v
           </FormField>
         </div>
         <div className="sm:col-span-2">
-          <FormField id="svc-image" label="Image link" hint="A web address (https://…) of an image that is already online. Images cannot be uploaded in this prototype; only the link is saved. Without a link a branded placeholder is shown." error={errors.image?.message}>
+          <FormField id="svc-image" label="Image link" hint="A web address (https://…) of an image that is already online. Images cannot be uploaded here; only the link is saved. Without a link a branded placeholder is shown." error={errors.image?.message}>
             {(c) => <Input {...c} {...register('image')} type="url" inputMode="url" autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={500} className={inputCls} />}
           </FormField>
         </div>

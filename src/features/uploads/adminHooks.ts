@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { fileRepository } from '@/services'
 import type { FileListParams } from '@/services/types'
 import type { ID } from '@/types'
@@ -15,3 +15,6 @@ export const useAdminFiles = (params: FileListParams) =>
 
 export const useAdminFile = (id: ID | null) =>
   useQuery({ queryKey: fileKeys.detail(id ?? ''), queryFn: () => fileRepository.getDetail(id as ID), enabled: id !== null, staleTime: 0, retry: false })
+
+/** A fresh signed link per click. A mutation, so the link is never kept in the query cache. */
+export const useFileDownload = () => useMutation({ mutationFn: (id: ID) => fileRepository.getDownloadUrl(id), gcTime: 0 })

@@ -4,7 +4,7 @@ import { buildTimeline } from '@/features/orders/timeline'
 import { ORDER_STATUSES, type Order, type OrderStatus } from '@/types'
 import { mockDashboardRepository as dashboard } from './dashboard'
 import { db } from './db'
-import { mockOrderRepository as repo } from './orders'
+import { MOCK_DEMO_TRACKING_CODE, mockOrderRepository as repo } from './orders'
 import { mockSchoolRepository as schools } from './schools'
 import { mockStudentRepository as students } from './students'
 
@@ -182,12 +182,15 @@ describe('admin status updates', () => {
   })
 })
 
+/** Public tracking needs the order number AND its tracking code; seeded demo orders share the published demo code. */
+const lookup = (ref: string, code: string = MOCK_DEMO_TRACKING_CODE) => repo.track(ref, code)
+
 describe('admin ↔ public tracking synchronisation', () => {
   it('shows an admin status change on the public lookup of the same reference, immediately', async () => {
-    expect((await repo.findByReference('JOB-2026-0007'))?.status).toBe('Order Received')
+    expect((await lookup('JOB-2026-0007'))?.status).toBe('Order Received')
     await repo.updateStatus(idOf('JOB-2026-0007'), 'Designing')
-    expect((await repo.findByReference('JOB-2026-0007'))?.status).toBe('Designing')
-    expect((await repo.findByReference(' job 2026 0007 '))?.status).toBe('Designing') // existing normalisation still applies
+    expect((await lookup('JOB-2026-0007'))?.status).toBe('Designing')
+    expect((await lookup(' job 2026 0007 '))?.status).toBe('Designing') // existing normalisation still applies
   })
 
   it('stores one record: admin and public read the same order, not copies', async () => {
@@ -202,7 +205,7 @@ describe('admin ↔ public tracking synchronisation', () => {
     let previous: OrderStatus = 'Order Received'
     for (const status of ORDER_STATUSES.slice(1)) {
       await repo.updateStatus(id, status)
-      const pub = await repo.findByReference('JOB-2026-0007')
+      const pub = await lookup('JOB-2026-0007')
       expect(pub!.status).toBe(status)
       const stages = buildTimeline(pub!.status)
       const at = ORDER_STATUSES.indexOf(status)
@@ -217,7 +220,7 @@ describe('admin ↔ public tracking synchronisation', () => {
 
   it('keeps the public whitelist after a status change: no id, school id, notes or history', async () => {
     await repo.updateStatus(idOf('JOB-2026-0009'), 'Delivered')
-    const pub = await repo.findByReference('JOB-2026-0009')
+    const pub = await lookup('JOB-2026-0009')
     expect(Object.keys(pub!).sort()).toEqual(['customer', 'expectedDelivery', 'orderDate', 'orderNo', 'quantity', 'service', 'status'])
     expect(JSON.stringify(pub)).not.toMatch(/AWB|notes|statusHistory|updatedAt|sch-|ord-/)
   })
@@ -225,30 +228,30 @@ describe('admin ↔ public tracking synchronisation', () => {
   it('keeps exact-match tracking: partial and malformed references still find nothing after updates', async () => {
     await repo.updateStatus(idOf('JOB-2026-0007'), 'Designing')
     for (const v of ['JOB-2026-000', '2026-0007', 'JOB', 'JOB-2026-00077', '', '   ', '%', '*', 'JOB-2026-0007 OR 1=1']) {
-      expect(await repo.findByReference(v), JSON.stringify(v)).toBeNull()
+      expect(await lookup(v), JSON.stringify(v)).toBeNull()
     }
   })
 
   it('still rejects (not hides) a lookup failure, and an admin update does not clear the failure hook', async () => {
     await repo.updateStatus(idOf('JOB-2026-0007'), 'Designing')
-    await expect(repo.findByReference('job-fail')).rejects.toThrow()
+    await expect(lookup('job-fail')).rejects.toThrow()
   })
 
   it('is reflected by the dashboard and the school’s student page, which read the same orders', async () => {
-    const before = (await dashboard.get()).counts
+    const before = await dashboard.getCounts()
     expect(before.pendingOrders).toBe(2) // 0006 Data Verification + 0007 Order Received
     await repo.updateStatus(idOf('JOB-2026-0007'), 'Printing')
-    const after = await dashboard.get()
-    expect(after.counts.pendingOrders).toBe(1)
-    expect(after.recentOrders.find((o) => o.orderNo === 'JOB-2026-0007')!.status).toBe('Printing')
+    const after = await dashboard.getCounts()
+    expect(after.pendingOrders).toBe(1)
+    expect((await dashboard.getRecentOrders()).find((o) => o.orderNo === 'JOB-2026-0007')!.status).toBe('Printing')
     const student = db.students.find((s) => s.schoolId === 'sch-lotus')
     if (student) {
       const detail = await students.getDetail(student.id)
       expect(detail.schoolOrders.find((o) => o.orderNo === 'JOB-2026-0007')!.status).toBe('Printing')
     }
-    const awaiting = after.counts.awaitingCompletion
+    const awaiting = after.awaitingCompletion
     await repo.updateStatus(idOf('JOB-2026-0007'), 'Delivered')
-    expect((await dashboard.get()).counts.awaitingCompletion).toBe(awaiting - 1)
+    expect((await dashboard.getCounts()).awaitingCompletion).toBe(awaiting - 1)
   })
 })
 
@@ -257,5 +260,48 @@ describe('order data integrity', () => {
     expect(db.orders).toHaveLength(9)
     expect(new Set(db.orders.map((o) => o.status)).size).toBe(ORDER_STATUSES.length)
     expect(db.orders.every((o) => o.statusHistory === undefined)).toBe(true)
+  })
+})
+
+describe('tracking codes', () => {
+  it('needs the order number AND the current code; a wrong code looks exactly like an unknown order', async () => {
+    expect((await repo.track('JOB-2026-0003', MOCK_DEMO_TRACKING_CODE))?.orderNo).toBe('JOB-2026-0003')
+    expect(await repo.track('JOB-2026-0003', 'AAAAA-AAAAA-AAAAA-AAAAA-AAAAA')).toBeNull()
+    expect(await repo.track('JOB-2026-9999', MOCK_DEMO_TRACKING_CODE)).toBeNull()
+    for (const code of ['', ' ', 'DEMQA', MOCK_DEMO_TRACKING_CODE.slice(0, -1), '%', '*']) expect(await repo.track('JOB-2026-0003', code), code).toBeNull()
+  })
+
+  it('accepts the code case-insensitively and with or without hyphens/spaces', async () => {
+    const compact = MOCK_DEMO_TRACKING_CODE.replace(/-/g, '').toLowerCase()
+    expect((await repo.track('job-2026-0003', compact))?.orderNo).toBe('JOB-2026-0003')
+    expect((await repo.track('JOB-2026-0003', compact.replace(/(.{5})/g, '$1 ')))?.orderNo).toBe('JOB-2026-0003')
+  })
+
+  it('create returns a new random code once; it tracks that order only', async () => {
+    const { order, trackingCode } = await repo.create({ schoolId: 'sch-lotus', service: 'ID Cards', quantity: 40, orderDate: '2026-10-01', expectedDelivery: '2026-10-10' })
+    expect(trackingCode).toMatch(/^[A-Z2-9]{5}(-[A-Z2-9]{5}){4}$/)
+    expect(trackingCode).not.toBe(MOCK_DEMO_TRACKING_CODE)
+    expect(order.status).toBe('Order Received')
+    expect(order.customer).toBe(db.schools.find((s) => s.id === 'sch-lotus')!.name)
+    expect((await repo.track(order.orderNo, trackingCode))?.orderNo).toBe(order.orderNo)
+    expect(await repo.track('JOB-2026-0003', trackingCode)).toBeNull()
+    expect(JSON.stringify(order)).not.toContain(trackingCode) // the stored/admin record never carries the code
+  })
+
+  it('rotation invalidates the previous code immediately', async () => {
+    const id = idOf('JOB-2026-0005')
+    const fresh = await repo.rotateTrackingCode(id)
+    expect(await repo.track('JOB-2026-0005', MOCK_DEMO_TRACKING_CODE)).toBeNull()
+    expect((await repo.track('JOB-2026-0005', fresh))?.orderNo).toBe('JOB-2026-0005')
+    expect(isRepositoryError(await rejection(repo.rotateTrackingCode('nope')), 'not_found')).toBe(true)
+  })
+
+  it('create validates its input and stores nothing on failure', async () => {
+    const before = db.orders.length
+    const e = await rejection(repo.create({ service: '', quantity: 0, orderDate: '2026-10-05', expectedDelivery: '2026-10-01' }))
+    expect(isRepositoryError(e, 'invalid_input')).toBe(true)
+    expect(Object.keys((e as { fieldErrors: object }).fieldErrors).sort()).toEqual(['customer', 'expectedDelivery', 'quantity', 'service'])
+    expect(isRepositoryError(await rejection(repo.create({ schoolId: 'sch-missing', service: 'x', quantity: 1, orderDate: '2026-10-01', expectedDelivery: '2026-10-01' })), 'not_found')).toBe(true)
+    expect(db.orders).toHaveLength(before)
   })
 })

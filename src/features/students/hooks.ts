@@ -2,7 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { toast } from 'sonner'
 import { studentRepository } from '@/services'
 import type { StudentListParams } from '@/services/types'
-import type { ID, Student, StudentEditInput, StudentSubmission } from '@/types'
+import type { ID, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission } from '@/types'
 
 export const studentKeys = {
   all: ['students'] as const,
@@ -60,3 +60,12 @@ export function useRestoreStudent() {
     }
   }
 }
+
+/** Approve, reject, or send back to pending. Refreshes the lists, the school counts and the dashboard. */
+export function useReviewStudent() {
+  const invalidate = useInvalidateAfterWrite()
+  return useMutation({ mutationFn: (v: { id: ID; decision: StudentApprovalStatus }) => studentRepository.review(v.id, v.decision), onSuccess: invalidate })
+}
+
+/** Fetches every row matching the filters for a CSV export (not cached: it is personal data, used once). */
+export const useExportStudents = () => useMutation({ mutationFn: (params: StudentListParams) => studentRepository.exportRows(params), gcTime: 0 })

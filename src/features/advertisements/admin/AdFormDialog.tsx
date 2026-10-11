@@ -82,7 +82,7 @@ function AdForm({ ad, onClose }: { ad?: Advertisement; onClose: () => void }) {
           {(c) => <Input {...c} {...register('whatsappMessage')} autoComplete="off" maxLength={120} className={inputCls} />}
         </FormField>
         <div className="sm:col-span-2">
-          <FormField id="ad-image" label="Image link" hint="A web address (https://…) of an image that is already online. Images cannot be uploaded in this prototype; without a link a branded placeholder is shown." error={errors.image?.message}>
+          <FormField id="ad-image" label="Image link" hint="A web address (https://…) of an image that is already online. Images cannot be uploaded here; without a link a branded placeholder is shown." error={errors.image?.message}>
             {(c) => <Input {...c} {...register('image')} type="url" inputMode="url" autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={500} className={inputCls} />}
           </FormField>
         </div>

@@ -47,6 +47,7 @@ export const mockFileRepository: FileRepository = {
       type: getExtension(file.name) as UploadedFileType,
       sizeBytes: file.size,
       uploadedAt: now.toISOString(),
+      storageState: 'metadata_only',
     }
     db.files.push(record) // the file's bytes are not kept in the prototype
 
@@ -99,5 +100,11 @@ export const mockFileRepository: FileRepository = {
     const file = db.files.find((f) => f.id === id)
     if (!file) throw new RepositoryError('not_found', 'File not found.')
     return toAdminFile(file)
+  },
+
+  async getDownloadUrl(id: ID) {
+    await mockFileRepository.getDetail(id) // invalid_id / not_found first
+    // Demo data keeps metadata only, so there are never bytes to download.
+    throw new RepositoryError('not_stored', 'Only the file details were recorded for this upload; there is no stored copy to download.')
   },
 }

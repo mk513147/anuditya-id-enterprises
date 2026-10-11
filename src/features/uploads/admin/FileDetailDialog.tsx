@@ -1,12 +1,14 @@
-import { FileX } from 'lucide-react'
+import { Download, FileX, Loader2 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { ErrorState, SkeletonBlock } from '@/components/shared/QueryState'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatBytes, formatDateTime } from '@/lib/format'
-import { isRepositoryError } from '@/services/errors'
+import { describeError, isRepositoryError } from '@/services/errors'
 import type { AdminFile } from '@/services/types'
 import { FILE_TYPE_LABEL } from '@/validations/upload'
-import { useAdminFile } from '../adminHooks'
+import { useAdminFile, useFileDownload } from '../adminHooks'
 import { NO_SCHOOL } from './fileColumns'
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -19,10 +21,11 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Presentational: exactly what the repository holds about a file. There is no download action because the
- * prototype keeps metadata only, and the dialog says so instead of offering a button that cannot work.
+ * Presentational: exactly what the repository holds about a file. `download` is the slot for the download control,
+ * shown only for files whose contents are stored; a metadata-only record says so instead of offering a button that
+ * cannot work.
  */
-export function FileDetails({ file }: { file: AdminFile }) {
+export function FileDetails({ file, download }: { file: AdminFile; download?: ReactNode }) {
   return (
     <div className="space-y-4">
       <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -40,10 +43,14 @@ export function FileDetails({ file }: { file: AdminFile }) {
       {!file.schoolName && (
         <p className="text-xs text-muted-ink">The public upload page does not ask for a school, so uploads made there have none recorded.</p>
       )}
-      <p role="note" className="rounded-lg border border-gold-400/40 bg-gold-100 px-3 py-2 text-sm text-navy-900">
-        <strong>File contents are not available.</strong> This prototype records details about each upload but does not keep the file itself, so it
-        cannot be opened or downloaded. Real file storage, and downloads, arrive with the Supabase phase. Records here reset when the page is reloaded.
-      </p>
+      {file.storageState === 'stored' ? (
+        download
+      ) : (
+        <p role="note" className="rounded-lg border border-gold-400/40 bg-gold-100 px-3 py-2 text-sm text-navy-900">
+          <strong>File contents are not available.</strong> Only the details of this upload were recorded, not the file itself, so it cannot be opened or
+          downloaded.
+        </p>
+      )}
     </div>
   )
 }
@@ -72,11 +79,40 @@ export function FileDetailDialog({ id, onClose }: { id: string | null; onClose: 
             <p className="text-sm text-muted-ink">It may have been removed or the page was reloaded. Close this and refresh the list.</p>
           </div>
         ) : isError ? (
-          <ErrorState message="Could not load this file's details." onRetry={() => void refetch()} />
+          <ErrorState message={describeError(error, "Could not load this file's details.")} onRetry={() => void refetch()} />
         ) : (
-          <FileDetails file={data} />
+          <FileDetails file={data} download={<DownloadButton id={data.id} />} />
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Asks for a short-lived download link and opens it straight away. The link is never stored, shown, logged or put in
+ * the page URL; when it expires (about a minute) a new click creates a new one.
+ */
+function DownloadButton({ id }: { id: string }) {
+  const download = useFileDownload()
+  const start = async () => {
+    try {
+      const url = await download.mutateAsync(id)
+      const a = document.createElement('a')
+      a.href = url
+      a.rel = 'noopener noreferrer'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch (e) {
+      toast.error(describeError(e, 'Could not download the file. Please try again.'))
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-surface px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-ink">The file is stored privately. Downloading creates a one-minute link for you only.</p>
+      <Button className="h-11 shrink-0" disabled={download.isPending} onClick={() => void start()}>
+        {download.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />} Download
+      </Button>
+    </div>
   )
 }

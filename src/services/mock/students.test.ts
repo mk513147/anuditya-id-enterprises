@@ -24,7 +24,14 @@ describe('student list: defaults and archive visibility', () => {
     const r = await repo.list(ALL)
     expect(r.items.every((s) => !s.isArchived)).toBe(true)
     expect(r.total).toBe(db.students.filter((s) => !s.isArchived).length)
-    expect(r.counts).toEqual({ active: db.students.filter((s) => !s.isArchived).length, archived: db.students.filter((s) => s.isArchived).length })
+    const live = db.students.filter((s) => !s.isArchived)
+    expect(r.counts).toEqual({
+      active: live.length,
+      archived: db.students.filter((s) => s.isArchived).length,
+      pending: live.filter((s) => s.approvalStatus === 'pending').length,
+      approved: live.filter((s) => s.approvalStatus === 'approved').length,
+      rejected: live.filter((s) => s.approvalStatus === 'rejected').length,
+    })
     expect(r.counts.archived).toBeGreaterThan(0)
   })
 
@@ -273,8 +280,7 @@ describe('archiving students', () => {
 
   it('removes archived students from school and dashboard counts but never loses them', async () => {
     const activeNow = db.students.filter((s) => !s.isArchived).length
-    const dash = await mockDashboardRepository.get()
-    expect(dash.counts.totalStudents).toBe(activeNow)
+    expect((await mockDashboardRepository.getCounts()).totalStudents).toBe(activeNow)
     const sunrise = await schools.getDetail('sch-sunrise')
     expect(sunrise.studentCount).toBe(db.students.filter((s) => s.schoolId === 'sch-sunrise' && !s.isArchived).length)
     expect(db.students.length).toBeGreaterThan(activeNow) // archived rows still exist

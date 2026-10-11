@@ -11,7 +11,7 @@ import { toFileListParams } from './useFileFilters'
 const count = (html: string, needle: string) => html.split(needle).length - 1
 const file = (over: Partial<AdminFile> = {}): AdminFile => ({
   id: 'fil-1', referenceNo: 'FILE-2026-00001', originalName: 'StMarys_Students_2026.xlsx', type: 'xlsx', sizeBytes: 254_976,
-  uploadedAt: '2026-06-09T10:15:00.000Z', schoolId: 'sch-stmarys', schoolName: "St. Mary's School", ...over,
+  uploadedAt: '2026-06-09T10:15:00.000Z', schoolId: 'sch-stmarys', schoolName: "St. Mary's School", storageState: 'metadata_only', ...over,
 })
 const noop = () => {}
 
@@ -73,12 +73,17 @@ describe('file details', () => {
     for (const t of ['StMarys_Students_2026.xlsx', 'FILE-2026-00001', 'Excel Spreadsheet (.xlsx)', '249 KB', '2,54,976 bytes', '9 Jun 2026', "St. Mary&#x27;s School"]) expect(html, t).toContain(t)
   })
 
-  it('explains that contents are unavailable and offers no download', () => {
-    const html = renderToStaticMarkup(<FileDetails file={file()} />)
+  it('explains that contents are unavailable for a metadata-only record and offers no download', () => {
+    const html = renderToStaticMarkup(<FileDetails file={file()} download={<button type="button">Download</button>} />)
     expect(html).toContain('File contents are not available.')
     expect(html).toContain('cannot be opened or downloaded')
-    expect(html).toContain('reset when the page is reloaded')
     expect(html).not.toMatch(/<a |<button|download=/)
+  })
+
+  it('shows the download control only for a stored file', () => {
+    const html = renderToStaticMarkup(<FileDetails file={file({ storageState: 'stored' })} download={<button type="button">Download</button>} />)
+    expect(html).toContain('<button type="button">Download</button>')
+    expect(html).not.toContain('File contents are not available.')
   })
 
   it('never shows a storage path, and explains a missing school', () => {

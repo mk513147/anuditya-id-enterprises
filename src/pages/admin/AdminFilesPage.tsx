@@ -14,6 +14,7 @@ import { fileStatGroups } from '@/features/uploads/admin/fileStats'
 import { toFileListParams, useFileFilters } from '@/features/uploads/admin/useFileFilters'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { formatBytes } from '@/lib/format'
+import { dataSource } from '@/services'
 import { isRepositoryError } from '@/services/errors'
 
 const PAGE_SIZE = 10
@@ -33,7 +34,7 @@ export function AdminFilesPage() {
         description={
           data ? (
             <span aria-live="polite">
-              <strong className="text-ink" data-testid="total-count">{data.total}</strong> {data.total === 1 ? 'file matches' : 'files match'} the current view. Only details about each upload are kept in this prototype, not the files themselves.
+              <strong className="text-ink" data-testid="total-count">{data.total}</strong> {data.total === 1 ? 'file matches' : 'files match'} the current view.{dataSource === 'mock' && ' Demo data keeps only the details of each upload, not the files themselves.'}
             </span>
           ) : (
             'Review the spreadsheets that have been uploaded.'

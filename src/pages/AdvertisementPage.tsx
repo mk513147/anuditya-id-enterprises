@@ -7,6 +7,7 @@ import { AdvertisementListing } from '@/features/advertisements/AdvertisementLis
 import { usePublicAdvertisements } from '@/features/advertisements/hooks'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { waMessages } from '@/lib/whatsapp'
+import { dataSource } from '@/services'
 import type { Advertisement } from '@/types'
 
 export function AdvertisementPage() {
@@ -27,7 +28,7 @@ export function AdvertisementPage() {
       <section aria-label="Offers" className="container-page py-10 sm:py-14">
         <Reveal>
           <p className="mb-6 max-w-2xl text-sm text-muted-ink sm:mb-8">
-            Sample offers are shown for this prototype. Message us on WhatsApp to confirm what is available for your institution.
+            {dataSource === 'mock' ? 'Sample offers are shown for this demo. ' : ''}Message us on WhatsApp to confirm what is available for your institution.
           </p>
         </Reveal>
         <AdvertisementListing

@@ -1,3 +1,5 @@
+import { Plus } from 'lucide-react'
+import { useState } from 'react'
 import { AdminPageHeader, AdminCard } from '@/components/admin/AdminPageHeader'
 import { DataTable } from '@/components/admin/DataTable'
 import { Pagination } from '@/components/admin/Pagination'
@@ -5,18 +7,21 @@ import { StatCard } from '@/components/admin/StatCard'
 import { EmptyState, ErrorState, SkeletonBlock } from '@/components/shared/QueryState'
 import { Button } from '@/components/ui/button'
 import { useAdminOrders } from '@/features/orders/hooks'
+import { OrderCreateDialog } from '@/features/orders/admin/OrderCreateDialog'
 import { OrderFilters } from '@/features/orders/admin/OrderFilters'
 import { adminOrderColumns, orderRowActions } from '@/features/orders/admin/orderColumns'
 import { orderStatGroups } from '@/features/orders/admin/orderStats'
 import { toOrderListParams, useOrderFilters } from '@/features/orders/admin/useOrderFilters'
 import { usePageTitle } from '@/hooks/usePageTitle'
+import { describeError } from '@/services/errors'
 
 const PAGE_SIZE = 10
 
 export function AdminOrdersPage() {
   usePageTitle('Orders – Admin')
   const { filters, update, clear, hasActiveFilters } = useOrderFilters()
-  const { data, isPending, isError, isFetching, refetch } = useAdminOrders(toOrderListParams(filters, PAGE_SIZE))
+  const { data, isPending, isError, error, isFetching, refetch } = useAdminOrders(toOrderListParams(filters, PAGE_SIZE))
+  const [creating, setCreating] = useState(false)
   const stats = data ? orderStatGroups(data.counts) : undefined
 
   return (
@@ -30,6 +35,11 @@ export function AdminOrdersPage() {
           ) : (
             'Find an order, check its progress and update its status.'
           )
+        }
+        actions={
+          <Button size="lg" onClick={() => setCreating(true)}>
+            <Plus aria-hidden /> New order
+          </Button>
         }
       />
 
@@ -46,7 +56,7 @@ export function AdminOrdersPage() {
 
         {isError ? (
           <div className="p-6">
-            <ErrorState message="Could not load orders." onRetry={() => void refetch()} />
+            <ErrorState message={describeError(error, 'Could not load orders.')} onRetry={() => void refetch()} />
           </div>
         ) : isPending ? (
           <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading orders">
@@ -77,6 +87,8 @@ export function AdminOrdersPage() {
           </>
         )}
       </AdminCard>
+
+      <OrderCreateDialog open={creating} onOpenChange={setCreating} />
     </>
   )
 }

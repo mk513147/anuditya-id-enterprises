@@ -1,4 +1,4 @@
-import type { OrderStatus } from '@/types'
+import type { OrderStatus, StudentApprovalStatus } from '@/types'
 import { cn } from '@/lib/utils'
 
 export type BadgeTone = 'neutral' | 'blue' | 'gold' | 'green'
@@ -36,3 +36,10 @@ export const OrderStatusBadge = ({ status }: { status: OrderStatus }) => <Status
 export const ActiveBadge = ({ active }: { active: boolean }) => (
   <StatusBadge tone={active ? 'green' : 'neutral'}>{active ? 'Active' : 'Inactive'}</StatusBadge>
 )
+
+const APPROVAL: Record<StudentApprovalStatus, { tone: BadgeTone; text: string }> = {
+  pending: { tone: 'gold', text: 'Pending review' },
+  approved: { tone: 'green', text: 'Approved' },
+  rejected: { tone: 'neutral', text: 'Rejected' },
+}
+export const ApprovalBadge = ({ status }: { status: StudentApprovalStatus }) => <StatusBadge tone={APPROVAL[status].tone}>{APPROVAL[status].text}</StatusBadge>

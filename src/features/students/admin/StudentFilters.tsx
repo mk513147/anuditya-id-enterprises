@@ -21,6 +21,7 @@ interface Props {
 }
 
 const label = 'mb-1.5 block text-sm'
+const APPROVAL_TEXT = { pending: 'Pending review', approved: 'Approved', rejected: 'Rejected' } as const
 
 export function StudentFilters({ filters, update, clear, schools, sections, hasActiveFilters }: Props) {
   const [text, setText] = useState(filters.q)
@@ -46,12 +47,13 @@ export function StudentFilters({ filters, update, clear, schools, sections, hasA
     filters.school && { key: 'school', text: `School: ${schoolName(filters.school)}`, remove: () => update({ school: '' }) },
     filters.cls && { key: 'cls', text: `Class: ${filters.cls}`, remove: () => update({ cls: '' }) },
     filters.section && { key: 'section', text: `Section: ${filters.section}`, remove: () => update({ section: '' }) },
+    filters.approval !== 'all' && { key: 'approval', text: `Review: ${APPROVAL_TEXT[filters.approval]}`, remove: () => update({ approval: 'all' }) },
     filters.status !== DEFAULT_STATUS && { key: 'status', text: `Status: ${filters.status === 'all' ? 'Active and archived' : 'Archived'}`, remove: () => update({ status: DEFAULT_STATUS }) },
     filters.from && { key: 'from', text: `From: ${formatDate(filters.from)}`, remove: () => update({ from: '' }) },
     filters.to && { key: 'to', text: `To: ${formatDate(filters.to)}`, remove: () => update({ to: '' }) },
   ].filter(Boolean) as { key: string; text: string; remove: () => void }[]
 
-  const secondary = cn('gap-3 sm:grid-cols-2 lg:grid-cols-4', moreOpen ? 'grid' : 'hidden md:grid')
+  const secondary = cn('gap-3 sm:grid-cols-2 lg:grid-cols-5', moreOpen ? 'grid' : 'hidden md:grid')
 
   return (
     <div className="border-b p-4 sm:p-5">
@@ -102,10 +104,19 @@ export function StudentFilters({ filters, update, clear, schools, sections, hasA
         onClick={() => setMoreOpen((o) => !o)}
       >
         <ChevronDown className={cn('transition-transform', moreOpen && 'rotate-180')} aria-hidden />
-        {moreOpen ? 'Fewer filters' : 'More filters (class, section, date)'}
+        {moreOpen ? 'Fewer filters' : 'More filters (review, class, section, date)'}
       </Button>
 
       <div id="stu-more-filters" className={cn(secondary, 'md:mt-3')}>
+        <div>
+          <Label htmlFor="stu-approval" className={label}>Review</Label>
+          <NativeSelect id="stu-approval" value={filters.approval} onChange={(e) => update({ approval: e.target.value as Filters['approval'] })}>
+            <option value="all">Any review status</option>
+            <option value="pending">Pending review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </NativeSelect>
+        </div>
         <div>
           <Label htmlFor="stu-class" className={label}>Class</Label>
           <NativeSelect id="stu-class" value={filters.cls} onChange={(e) => update({ cls: e.target.value })}>

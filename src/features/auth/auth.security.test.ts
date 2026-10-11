@@ -24,7 +24,8 @@ describe('no public sign-up and no role self-assignment', () => {
   it('the app never writes to profiles or calls the provisioning function', () => {
     expect(matching(/from\(\s*['"`]profiles['"`]\s*\)\s*\.\s*(insert|update|upsert|delete)/)).toEqual([])
     expect(matching(/provision_administrator/)).toEqual([])
-    expect(matching(/rpc\(\s*['"`]admin_/)).toEqual([]) // admin functions are not wired in this phase
+    // Administrator functions are called only by the Supabase repositories (each re-checks is_admin() in the database).
+    expect(matching(/rpc\(\s*['"`]admin_/).every((f) => f.startsWith('src/services/supabase/'))).toBe(true)
   })
 
   it('the only table the app reads for authentication is profiles, selecting only the role', () => {
@@ -52,7 +53,7 @@ describe('no privileged credentials in browser code', () => {
     for (const f of [...appFiles, path.join(SRC, 'vite-env.d.ts'), path.join(ROOT, '.env.example')].filter((x) => fs.existsSync(x))) {
       for (const m of fs.readFileSync(f, 'utf8').matchAll(/VITE_[A-Z0-9_]+/g)) names.add(m[0])
     }
-    expect([...names].sort()).toEqual(['VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_URL'])
+    expect([...names].sort()).toEqual(['VITE_DATA_SOURCE', 'VITE_SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_URL'])
     for (const n of names) expect(n).not.toMatch(/SECRET|SERVICE|PRIVATE|PASSWORD|DB_|DATABASE/)
   })
 
@@ -78,11 +79,12 @@ describe('no privileged credentials in browser code', () => {
   })
 })
 
-describe('existing public workflows still run on the mock repositories', () => {
-  it('src/services/index.ts still wires the mock repositories and nothing from Supabase', () => {
+describe('public workflows are independent of the auth module', () => {
+  it('src/services/index.ts chooses the data source in one place and keeps the mock repositories for demo mode', () => {
     const wiring = fs.readFileSync(path.join(SRC, 'services/index.ts'), 'utf8')
     expect(wiring).toMatch(/from '\.\/mock/)
-    expect(wiring.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')).not.toMatch(/supabase/i) // comments aside
+    expect(wiring).toMatch(/resolveDataSource\(/)
+    expect(wiring).not.toMatch(/features\/auth/)
   })
 
   it('the public order lookup and student submission code do not depend on the auth module', () => {

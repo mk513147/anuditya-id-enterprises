@@ -4,53 +4,54 @@ import type { FeedbackInput } from '@/types'
 import { mockAdvertisementRepository as ads } from './advertisements'
 import { db } from './db'
 import { mockFeedbackRepository as feedback } from './feedback'
-import { mockOrderRepository as orders } from './orders'
+import { MOCK_DEMO_TRACKING_CODE, mockOrderRepository as orders } from './orders'
 
 vi.mock('@/lib/delay', () => ({ delay: () => Promise.resolve() }))
 
 const NOW = new Date('2026-10-06T12:00:00.000Z')
+const lookup = (ref: string) => orders.track(ref, MOCK_DEMO_TRACKING_CODE)
 const titles = async (now: Date) => (await ads.listPublic(now)).map((a) => a.id).sort()
 
 describe('order lookup (public)', () => {
   it('finds an order by its exact reference', async () => {
-    const o = await orders.findByReference('JOB-2026-0003')
+    const o = await lookup('JOB-2026-0003')
     expect(o).toMatchObject({ orderNo: 'JOB-2026-0003', customer: 'Sunrise Public School', service: 'School Diary', quantity: 600, status: 'Printing' })
   })
 
   it('is case-insensitive and tolerates surrounding or inner whitespace', async () => {
     for (const v of ['job-2026-0003', '  JOB-2026-0003  ', 'job 2026 0003']) {
-      expect((await orders.findByReference(v))?.orderNo).toBe('JOB-2026-0003')
+      expect((await lookup(v))?.orderNo).toBe('JOB-2026-0003')
     }
   })
 
   it('returns null for a reference that does not exist', async () => {
-    expect(await orders.findByReference('JOB-2026-9999')).toBeNull()
-    expect(await orders.findByReference('ABC-0000-0000')).toBeNull()
+    expect(await lookup('JOB-2026-9999')).toBeNull()
+    expect(await lookup('ABC-0000-0000')).toBeNull()
   })
 
   it('NEVER returns another order for a partial, empty or malformed reference', async () => {
     for (const v of ['', '   ', 'JOB', 'JOB-2026', 'JOB-2026-000', 'JOB-2026-00033', '2026', '0003', '%%%%%', "' OR '1'='1", 'JOB-2026-0003;', 'JOB-2026-0003 extra']) {
-      expect(await orders.findByReference(v), `reference ${JSON.stringify(v)}`).toBeNull()
+      expect(await lookup(v), `reference ${JSON.stringify(v)}`).toBeNull()
     }
   })
 
   it('exposes only whitelisted fields: no id, school id or internal notes', async () => {
     const stored = db.orders.find((o) => o.orderNo === 'JOB-2026-0009')!
     expect(stored.notes).toBeTruthy() // the demo order really has an internal note…
-    const o = await orders.findByReference('JOB-2026-0009')
+    const o = await lookup('JOB-2026-0009')
     expect(Object.keys(o!).sort()).toEqual(['customer', 'expectedDelivery', 'orderDate', 'orderNo', 'quantity', 'service', 'status'])
     expect(JSON.stringify(o)).not.toContain('AWB') // …and it never leaves the data layer
   })
 
   it('returns a copy, so callers cannot mutate stored orders', async () => {
-    const o = await orders.findByReference('JOB-2026-0003')
+    const o = await lookup('JOB-2026-0003')
     o!.status = 'Delivered'
     expect(db.orders.find((x) => x.orderNo === 'JOB-2026-0003')!.status).toBe('Printing')
   })
 
   it('rejects on the documented failure reference, and nothing is changed', async () => {
     const before = JSON.stringify(db.orders)
-    await expect(orders.findByReference('job-fail')).rejects.toThrow()
+    await expect(lookup('job-fail')).rejects.toThrow()
     expect(JSON.stringify(db.orders)).toBe(before)
   })
 

@@ -5,6 +5,7 @@ import { Reveal } from '@/components/shared/Reveal'
 import { SectionHeading } from '@/components/shared/SectionHeading'
 import { Button } from '@/components/ui/button'
 import { AdCard } from '@/features/advertisements/AdCard'
+import { dataSource } from '@/services'
 import { usePublicAdvertisements } from '@/features/advertisements/hooks'
 
 export function AdvertisementSection() {
@@ -19,7 +20,7 @@ export function AdvertisementSection() {
           id="ads-title"
           eyebrow="Offers & Updates"
           title="Our special offers and latest updates"
-          description="Sample offers shown for this prototype."
+          description={dataSource === 'mock' ? 'Sample offers shown for this demo.' : 'Current offers. Message us on WhatsApp to confirm what is available for your institution.'}
           action={
             <Button asChild variant="outline">
               <Link to="/advertisement">

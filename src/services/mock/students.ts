@@ -1,8 +1,8 @@
 import { delay } from '@/lib/delay'
 import { localDateISO } from '@/lib/format'
-import type { Student, StudentEditInput } from '@/types'
+import { STUDENT_APPROVAL_STATUSES, type Student, type StudentEditInput } from '@/types'
 import { RepositoryError } from '../errors'
-import type { AdminStudent, StudentRepository } from '../types'
+import { STUDENT_EXPORT_LIMIT, type AdminStudent, type StudentListParams, type StudentRepository } from '../types'
 import { db, pad5 } from './db'
 
 /**
@@ -29,6 +29,24 @@ const find = (id: string) => {
 }
 
 const sameText = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** Every student matching the filters, in list order (newest submission first). */
+function filterStudents({ search = '', schoolId, className, section, status = 'active', approval = 'all', submittedFrom, submittedTo }: StudentListParams = {}) {
+  const q = search.trim().toLowerCase()
+  return db.students
+    .filter((s) => (status === 'all' ? true : status === 'archived' ? s.isArchived : !s.isArchived))
+    .filter((s) => approval === 'all' || s.approvalStatus === approval)
+    .filter((s) => !schoolId || s.schoolId === schoolId)
+    .filter((s) => !className || s.className === className)
+    .filter((s) => !section || sameText(s.section, section))
+    .filter((s) => {
+      if (!submittedFrom && !submittedTo) return true
+      const day = localDateISO(s.submittedAt)
+      return (!submittedFrom || day >= submittedFrom) && (!submittedTo || day <= submittedTo)
+    })
+    .filter((s) => !q || [s.name, s.referenceNo, s.admissionNo, s.rollNo].some((v) => v.toLowerCase().includes(q)))
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.referenceNo.localeCompare(a.referenceNo))
+}
 
 export const mockStudentRepository: StudentRepository = {
   async submit(input) {
@@ -58,29 +76,15 @@ export const mockStudentRepository: StudentRepository = {
       submittedAt,
       updatedAt: submittedAt,
       isArchived: false,
+      approvalStatus: 'pending', // always: only the administrator approves a submission
     })
     return { referenceNo, submittedAt, schoolName: school.name }
   },
 
-  async list({ search = '', schoolId, className, section, status = 'active', submittedFrom, submittedTo, page = 1, pageSize = 10 } = {}) {
+  async list(params = {}) {
     await delay(250)
-    const q = search.trim().toLowerCase()
-    const matches = db.students
-      .filter((s) => (status === 'all' ? true : status === 'archived' ? s.isArchived : !s.isArchived))
-      .filter((s) => !schoolId || s.schoolId === schoolId)
-      .filter((s) => !className || s.className === className)
-      .filter((s) => !section || sameText(s.section, section))
-      .filter((s) => {
-        if (!submittedFrom && !submittedTo) return true
-        const day = localDateISO(s.submittedAt)
-        return (!submittedFrom || day >= submittedFrom) && (!submittedTo || day <= submittedTo)
-      })
-      .filter(
-        (s) =>
-          !q ||
-          [s.name, s.referenceNo, s.admissionNo, s.rollNo].some((v) => v.toLowerCase().includes(q)),
-      )
-      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt) || b.referenceNo.localeCompare(a.referenceNo))
+    const { page = 1, pageSize = 10 } = params
+    const matches = filterStudents(params)
 
     const total = matches.length
     const size = Math.max(1, pageSize)
@@ -92,7 +96,13 @@ export const mockStudentRepository: StudentRepository = {
       page: current,
       pageSize: size,
       totalPages,
-      counts: { active: db.students.filter((s) => !s.isArchived).length, archived: db.students.filter((s) => s.isArchived).length },
+      counts: {
+        active: db.students.filter((s) => !s.isArchived).length,
+        archived: db.students.filter((s) => s.isArchived).length,
+        pending: db.students.filter((s) => !s.isArchived && s.approvalStatus === 'pending').length,
+        approved: db.students.filter((s) => !s.isArchived && s.approvalStatus === 'approved').length,
+        rejected: db.students.filter((s) => !s.isArchived && s.approvalStatus === 'rejected').length,
+      },
     }
   },
 
@@ -140,5 +150,24 @@ export const mockStudentRepository: StudentRepository = {
   async getFilterOptions() {
     await delay(100)
     return { sections: [...new Set(db.students.map((s) => s.section.toUpperCase()))].sort() }
+  },
+
+  async review(id, decision) {
+    await delay(400)
+    if (typeof id !== 'string' || id.trim() === '') throw new RepositoryError('invalid_id', 'A student id is required.')
+    const student = find(id)
+    if (!(STUDENT_APPROVAL_STATUSES as readonly string[]).includes(decision)) throw new RepositoryError('invalid_status', 'That is not a supported review decision.')
+    if (student.approvalStatus === decision) throw new RepositoryError('no_change', `This submission is already ${decision}.`)
+    const now = new Date().toISOString()
+    student.approvalStatus = decision
+    student.reviewedAt = decision === 'pending' ? undefined : now
+    student.updatedAt = now
+    return { ...student }
+  },
+
+  async exportRows(params = {}) {
+    await delay(300)
+    const matches = filterStudents(params)
+    return { rows: matches.slice(0, STUDENT_EXPORT_LIMIT).map(withSchool), truncated: matches.length > STUDENT_EXPORT_LIMIT }
   },
 }

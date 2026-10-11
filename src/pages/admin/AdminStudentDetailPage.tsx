@@ -1,17 +1,19 @@
-import { Archive, ArchiveRestore, ArrowLeft, Building2, Pencil, UserRound } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, Building2, Check, Pencil, Undo2, UserRound, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { AdminCard } from '@/components/admin/AdminPageHeader'
 import { DataTable, type Column } from '@/components/admin/DataTable'
-import { ActiveBadge, OrderStatusBadge, StatusBadge } from '@/components/admin/StatusBadge'
+import { ActiveBadge, ApprovalBadge, OrderStatusBadge, StatusBadge } from '@/components/admin/StatusBadge'
 import { ErrorState, SkeletonBlock } from '@/components/shared/QueryState'
 import { Button } from '@/components/ui/button'
 import { StudentArchiveDialog } from '@/features/students/admin/StudentArchiveDialog'
 import { StudentEditDialog } from '@/features/students/admin/StudentEditDialog'
-import { useRestoreStudent, useStudentDetail } from '@/features/students/hooks'
+import { useRestoreStudent, useReviewStudent, useStudentDetail } from '@/features/students/hooks'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { formatDate, formatDateTime } from '@/lib/format'
-import type { Order } from '@/types'
+import { describeError } from '@/services/errors'
+import type { Order, StudentApprovalStatus } from '@/types'
 
 const NOT_PROVIDED = <span className="font-normal text-muted-ink">Not provided</span>
 
@@ -42,10 +44,19 @@ const orderColumns: Column<Order>[] = [
 
 export function AdminStudentDetailPage() {
   const { studentId = '' } = useParams()
-  const { data, isPending, isError, refetch } = useStudentDetail(studentId)
+  const { data, isPending, isError, error, refetch } = useStudentDetail(studentId)
   const restore = useRestoreStudent()
   const [editOpen, setEditOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const review = useReviewStudent()
+  const decide = async (decision: StudentApprovalStatus) => {
+    try {
+      await review.mutateAsync({ id: studentId, decision })
+      toast.success(decision === 'approved' ? 'Submission approved' : decision === 'rejected' ? 'Submission rejected' : 'Sent back to the review queue')
+    } catch (e) {
+      toast.error(describeError(e, 'Could not save the review decision. Please try again.'))
+    }
+  }
   usePageTitle(data ? `${data.student.name} – Admin` : 'Student – Admin')
 
   const back = (
@@ -72,7 +83,7 @@ export function AdminStudentDetailPage() {
     return (
       <>
         {back}
-        <ErrorState message="This student could not be found. The link may be wrong or the record may no longer exist." onRetry={() => void refetch()} />
+        <ErrorState message={describeError(error, 'This student could not be loaded.')} onRetry={() => void refetch()} />
       </>
     )
   }
@@ -101,12 +112,35 @@ export function AdminStudentDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-2xl font-extrabold">{s.name}</h2>
               <StatusBadge tone={s.isArchived ? 'neutral' : 'green'}>{s.isArchived ? 'Archived' : 'Active'}</StatusBadge>
+              <ApprovalBadge status={s.approvalStatus} />
             </div>
             <p className="mt-1 text-sm text-muted-ink">
               Reference <span className="font-mono font-semibold text-ink" data-testid="student-ref">{s.referenceNo}</span>
             </p>
             <p className="mt-1 text-sm text-muted-ink">
               {s.className} · Section {s.section} · Roll {s.rollNo}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2 print:hidden" role="group" aria-label="Review decision">
+              {s.approvalStatus !== 'approved' && (
+                <Button className="h-11" disabled={review.isPending} onClick={() => void decide('approved')}>
+                  <Check aria-hidden /> Approve
+                </Button>
+              )}
+              {s.approvalStatus !== 'rejected' && (
+                <Button variant="outline" className="h-11" disabled={review.isPending} onClick={() => void decide('rejected')}>
+                  <X className="text-destructive" aria-hidden /> Reject
+                </Button>
+              )}
+              {s.approvalStatus !== 'pending' && (
+                <Button variant="ghost" className="h-11" disabled={review.isPending} onClick={() => void decide('pending')}>
+                  <Undo2 aria-hidden /> Back to pending
+                </Button>
+              )}
+            </div>
+            <p className="mt-2 text-xs text-muted-ink">
+              {s.approvalStatus === 'pending'
+                ? 'New submission: check the details and photo, then approve or reject it.'
+                : `${s.approvalStatus === 'approved' ? 'Approved' : 'Rejected'}${s.reviewedAt ? ` on ${formatDate(s.reviewedAt)}` : ''}.`}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:flex print:hidden">
               <Button variant="outline" className="h-11" onClick={() => setEditOpen(true)}>

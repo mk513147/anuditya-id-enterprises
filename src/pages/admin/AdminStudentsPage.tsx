@@ -1,9 +1,11 @@
+import { Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 import { AdminCard, AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { DataTable, type Column } from '@/components/admin/DataTable'
 import { Pagination } from '@/components/admin/Pagination'
-import { StatusBadge } from '@/components/admin/StatusBadge'
+import { ApprovalBadge, StatusBadge } from '@/components/admin/StatusBadge'
 import { EmptyState, ErrorState, SkeletonBlock } from '@/components/shared/QueryState'
 import { Button } from '@/components/ui/button'
 import { useSchools } from '@/features/schools/hooks'
@@ -11,10 +13,13 @@ import { StudentArchiveDialog } from '@/features/students/admin/StudentArchiveDi
 import { StudentEditDialog } from '@/features/students/admin/StudentEditDialog'
 import { StudentFilters } from '@/features/students/admin/StudentFilters'
 import { StudentRowActions } from '@/features/students/admin/StudentRowActions'
+import { studentExportFilename, studentsCsv } from '@/features/students/admin/studentExport'
 import { toListParams, useStudentFilters } from '@/features/students/admin/useStudentFilters'
-import { useAdminStudents, useRestoreStudent, useStudentFilterOptions } from '@/features/students/hooks'
+import { useAdminStudents, useExportStudents, useRestoreStudent, useStudentFilterOptions } from '@/features/students/hooks'
 import { usePageTitle } from '@/hooks/usePageTitle'
+import { downloadText } from '@/lib/csv'
 import { formatDate } from '@/lib/format'
+import { describeError } from '@/services/errors'
 import type { AdminStudent } from '@/services/types'
 import type { Student } from '@/types'
 
@@ -23,12 +28,30 @@ const PAGE_SIZE = 10
 export function AdminStudentsPage() {
   usePageTitle('Students – Admin')
   const { filters, update, clear, hasActiveFilters } = useStudentFilters()
-  const { data, isPending, isError, isFetching, refetch } = useAdminStudents(toListParams(filters, PAGE_SIZE))
+  const { data, isPending, isError, error, isFetching, refetch } = useAdminStudents(toListParams(filters, PAGE_SIZE))
   const { data: schools = [] } = useSchools({})
   const { data: options } = useStudentFilterOptions()
   const restore = useRestoreStudent()
   const [editing, setEditing] = useState<AdminStudent | null>(null)
   const [archiving, setArchiving] = useState<Student | null>(null)
+  const exporter = useExportStudents()
+
+  /** Exports every student matching the current filters (all pages), with an explicit column list. */
+  const exportCsv = async () => {
+    try {
+      const { rows, truncated } = await exporter.mutateAsync({ ...toListParams(filters), page: undefined, pageSize: undefined })
+      if (rows.length === 0) {
+        toast.info('Nothing to export', { description: 'No students match the current filters.' })
+        return
+      }
+      downloadText(studentExportFilename(), studentsCsv(rows))
+      toast.success(`Exported ${rows.length} ${rows.length === 1 ? 'student' : 'students'}`, {
+        description: truncated ? 'The export limit was reached: narrow the filters to export the rest.' : 'The file is in your downloads. It contains personal data: store it securely.',
+      })
+    } catch (e) {
+      toast.error(describeError(e, 'Could not export the students. Please try again.'))
+    }
+  }
 
   const columns: Column<AdminStudent>[] = [
     {
@@ -68,6 +91,7 @@ export function AdminStudentsPage() {
       ),
     },
     { key: 'submitted', header: 'Submitted', cell: (s) => formatDate(s.submittedAt), className: 'whitespace-nowrap' },
+    { key: 'review', header: 'Review', cell: (s) => <ApprovalBadge status={s.approvalStatus} /> },
     { key: 'status', header: 'Status', cell: (s) => <StatusBadge tone={s.isArchived ? 'neutral' : 'green'}>{s.isArchived ? 'Archived' : 'Active'}</StatusBadge> },
   ]
 
@@ -78,11 +102,20 @@ export function AdminStudentsPage() {
           data ? (
             <span aria-live="polite">
               <strong className="text-ink" data-testid="total-count">{data.total}</strong> {data.total === 1 ? 'student matches' : 'students match'} the current view ·{' '}
-              <span data-testid="active-count">{data.counts.active}</span> active · <span data-testid="archived-count">{data.counts.archived}</span> archived
+              <span data-testid="active-count">{data.counts.active}</span> active · <span data-testid="archived-count">{data.counts.archived}</span> archived ·{' '}
+              <button type="button" className="font-semibold text-royal-700 underline-offset-2 hover:underline" onClick={() => update({ approval: 'pending', status: 'active' })}>
+                <span data-testid="pending-count">{data.counts.pending}</span> pending review
+              </button>
             </span>
           ) : (
-            'Find a student, open the full record, edit details or archive it.'
+            'Find a student, review new submissions, open the full record, edit details or archive it.'
           )
+        }
+        actions={
+          <Button size="lg" variant="outline" onClick={() => void exportCsv()} disabled={exporter.isPending || !data || data.total === 0}>
+            {exporter.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
+            Export CSV
+          </Button>
         }
       />
 
@@ -98,7 +131,7 @@ export function AdminStudentsPage() {
 
         {isError ? (
           <div className="p-6">
-            <ErrorState message="Could not load students." onRetry={() => void refetch()} />
+            <ErrorState message={describeError(error, 'Could not load students.')} onRetry={() => void refetch()} />
           </div>
         ) : isPending ? (
           <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading students">

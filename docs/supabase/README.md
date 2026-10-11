@@ -1,9 +1,10 @@
-# Supabase foundation (Phase A): draft
+# Supabase integration
 
-**Status: DRAFT. Nothing here has been applied to any Supabase project.** The app still runs entirely on the mock
-repositories; no repository adapter, login or UI was changed in this phase.
+**Status:** migrations 1-12 were reviewed for the hosted development project; migration 13 (Phase 3) is **new and has not
+been applied anywhere**. The app now has Supabase repository adapters for every module (Phase 3, see
+[phase3-integration.md](phase3-integration.md)); which data source runs is chosen at start-up (`src/services/runtime.ts`).
 
-Contents: this file (plan, migrations, mapping) · [security.md](security.md) · [testing.md](testing.md) ·
+Contents: this file (plan, migrations, mapping) · [phase3-integration.md](phase3-integration.md) (runtime modes, deployment) · [security.md](security.md) · [testing.md](testing.md) ·
 [decisions.md](decisions.md) (assumptions and open business rules).
 Authentication and the administrator account: [authentication.md](authentication.md) (frontend login, environment, hosting) and
 [admin-provisioning.md](admin-provisioning.md) (how the single administrator is created and recovered). The manual SQL for provisioning is in `supabase/provisioning/`.
@@ -13,8 +14,9 @@ Authentication and the administrator account: [authentication.md](authentication
 | Phase | Scope | State |
 | --- | --- | --- |
 | **A (this change)** | SQL migrations, RLS, public functions, private buckets, DB tests, docs. | Drafted, tested locally in an emulator (see testing.md). Not applied. |
-| B | Edge Functions for public writes (bot protection, signed uploads), `supabase` repository adapters, real login and route guard. | Not started |
-| C | Data/seed strategy for real data, end-to-end and contract tests, production rollout. | Not started |
+| B | Real login and route guard for the single administrator. | Done (see authentication.md) |
+| 3 | `supabase` repository adapters for every module, insert-only public uploads, admin summary RPC, tracking-code UX, student review, CSV export. | Implemented and tested locally; migration 13 not applied. |
+| C | Data/seed strategy for real data, bot protection / rate limiting, end-to-end tests against a hosted project, production rollout. | Not started |
 
 ## Migrations (apply in this order; each depends on the ones before)
 
@@ -32,6 +34,7 @@ Authentication and the administrator account: [authentication.md](authentication
 | 10 | `20261011150010_write_and_tracking_functions.sql` | `submit_student`, `submit_feedback`, `track_order`, four `admin_*` functions. |
 | 11 | `20261011150011_private_storage.sql` | Private buckets and the one admin-only read policy. |
 | 12 | `20261011160001_restrict_private_schema_usage.sql` | Forward-only hardening: `anon`/`authenticated` lose USAGE on `private` (they keep EXECUTE on `private.is_admin()` for RLS). |
+| 13 | `20261012090001_phase3_public_uploads_and_admin_summary.sql` | Insert-only upload policies (fixed folder, random name, allowed extension) for the two private buckets; `submit_student` validates the uploaded photo; `submit_file_upload`; `admin_summary()` (counts only, admin only). |
 
 `supabase/seed.sql` is a **local-only** development seed (12 services and 5 fictional demo schools; no students,
 orders, files, feedback or secrets). `supabase/config.toml` was changed locally to disable signup and require
@@ -78,10 +81,11 @@ cancelled orders, enrolments or student roles.
 | `OrderRepository.updateStatus()` | `rpc admin_set_order_status(id, status)` | no |
 | *(new)* create an order and issue its code | `rpc admin_create_order(...)` | no |
 | *(new)* replace a lost tracking code | `rpc admin_rotate_tracking_code(id)` | no |
-| `FileRepository.upload()` | Phase B server function (storage + metadata row) | no |
+| `FileRepository.upload()` | insert-only upload to `school-uploads/incoming/<uuid>.<ext>`, then `rpc submit_file_upload(path, name)` | no |
 | `FileRepository.list/getDetail` | admin `select` on `uploaded_files` | yes, admin only |
-| `DashboardRepository.get()` | Phase B admin aggregate RPC | not in this phase |
+| `FileRepository.getDownloadUrl()` | admin signed URL (60 s) on `school-uploads` | storage, admin only |
+| `DashboardRepository.getCounts/getRecentSchools` | `rpc admin_summary()` | no |
+| `DashboardRepository.getRecentOrders` | admin `select` on `orders` (explicit columns) | yes, admin only |
 
-Two existing interfaces will need an intentional change in Phase B, and neither was touched now:
-`OrderRepository.findByReference` (the public lookup now needs the secret code) and `StudentRepository`
-(listing should separate pending, approved and rejected submissions).
+Phase 3 made the two planned interface changes: `OrderRepository.track(orderNo, trackingCode)` replaced
+`findByReference`, and `StudentRepository` gained `review`, an approval filter/counts and `exportRows`.

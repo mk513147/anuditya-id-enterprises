@@ -18,10 +18,11 @@ select is((select file_size_limit from storage.buckets where id = 'student-photo
 select is((select allowed_mime_types from storage.buckets where id = 'student-photos'), array['image/jpeg', 'image/png'], 'photos accept only JPEG and PNG');
 select is((select 'text/csv' = any (allowed_mime_types) and 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' = any (allowed_mime_types)
                   and not ('application/pdf' = any (allowed_mime_types)) from storage.buckets where id = 'school-uploads'), true, 'the spreadsheet bucket accepts spreadsheets only');
-select is((select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and ('anon' = any (roles) or 'public' = any (roles)))::int, 0,
-  'there is no storage policy for anon or public');
-select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects'), array['SELECT'],
-  'the only storage policy is a SELECT policy (no client insert, update or delete)');
+select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and ('anon' = any (roles) or 'public' = any (roles))),
+  array['INSERT', 'INSERT'],
+  'anon has only the two insert-only upload policies (Phase 3): no anon SELECT, UPDATE or DELETE on storage');
+select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects'), array['INSERT', 'INSERT', 'SELECT'],
+  'storage policies: two insert-only upload policies and the administrator read policy; no client update or delete');
 
 -- Objects, as the trusted server would have written them (service_role bypasses RLS) -----------------------------------------------------------
 set local role service_role;

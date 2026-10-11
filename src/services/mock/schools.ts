@@ -48,7 +48,7 @@ export const mockSchoolRepository: SchoolRepository = {
     return db.schools
       .filter((s) => s.isActive)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((s) => ({ ...s }))
+      .map((s) => ({ id: s.id, name: s.name })) // the public dropdown gets nothing else
   },
 
   async getDetail(id) {
@@ -66,7 +66,7 @@ export const mockSchoolRepository: SchoolRepository = {
     await delay(300)
     const school = db.schools.find((s) => s.slug.toLowerCase() === slug.toLowerCase())
     if (!school) return { status: 'not_found' }
-    return school.isActive ? { status: 'active', school: { ...school } } : { status: 'inactive' }
+    return school.isActive ? { status: 'active', school: { id: school.id, name: school.name, slug: school.slug } } : { status: 'inactive' }
   },
 
   async create(input) {

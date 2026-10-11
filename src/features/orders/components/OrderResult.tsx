@@ -66,7 +66,7 @@ export function OrderResult({ state, onRetry, onTrackAnother }: Props) {
           We could not find that order
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-ink">
-          There is no order with the reference <strong className="break-all text-ink">“{state.reference}”</strong>. Please check the number on your receipt or message, and try again.
+          We could not match the order number <strong className="break-all text-ink">“{state.reference}”</strong> with that tracking code. Please check both on your order confirmation, and try again.
         </p>
         <div className="mt-6 flex flex-col justify-center gap-3 min-[420px]:flex-row">
           <Button size="lg" onClick={onTrackAnother}>

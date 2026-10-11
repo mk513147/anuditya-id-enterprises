@@ -1,5 +1,6 @@
 import { OrderStatusBadge } from '@/components/admin/StatusBadge'
 import { formatDate, formatDateTime } from '@/lib/format'
+import { dataSource } from '@/services'
 import type { Order } from '@/types'
 
 /**
@@ -25,7 +26,7 @@ export function OrderHistory({ order }: { order: Pick<Order, 'orderDate' | 'stat
         ))}
       </ol>
       {changes.length === 0 && (
-        <p className="mt-3 text-sm text-muted-ink">No status changes have been recorded yet. Changes made from this page appear here (prototype data resets when the page is reloaded).</p>
+        <p className="mt-3 text-sm text-muted-ink">No status changes have been recorded yet. Changes made from this page appear here.{dataSource === 'mock' && ' (Demo data resets when the page is reloaded.)'}</p>
       )}
     </div>
   )

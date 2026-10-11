@@ -99,8 +99,13 @@ describe('admin file detail', () => {
   it('returns one record with its school', async () => {
     expect(await repo.getDetail('fil-3')).toEqual({
       id: 'fil-3', referenceNo: 'FILE-2026-00003', originalName: 'Sunrise_List.xls', type: 'xls', sizeBytes: 122_880,
-      uploadedAt: '2026-09-04T09:05:00.000Z', schoolId: 'sch-sunrise', schoolName: 'Sunrise Public School',
+      uploadedAt: '2026-09-04T09:05:00.000Z', schoolId: 'sch-sunrise', schoolName: 'Sunrise Public School', storageState: 'metadata_only',
     })
+  })
+
+  it('offers no download for a metadata-only record', async () => {
+    expect(isRepositoryError(await repo.getDownloadUrl('fil-3').then(() => null, (e: unknown) => e), 'not_stored')).toBe(true)
+    expect(isRepositoryError(await repo.getDownloadUrl('nope').then(() => null, (e: unknown) => e), 'not_found')).toBe(true)
   })
 
   it('uses the school’s current name', async () => {
@@ -130,7 +135,8 @@ describe('public upload flow (regression)', () => {
     const result = await repo.upload(sheet('Class9.csv', 'name,roll\nA,1\n'), { onProgress: (p) => progress.push(p) })
     expect(db.files).toHaveLength(before + 1)
     const stored = db.files.at(-1)!
-    expect(Object.keys(stored).sort()).toEqual(['id', 'originalName', 'referenceNo', 'sizeBytes', 'storagePath', 'type', 'uploadedAt'])
+    expect(Object.keys(stored).sort()).toEqual(['id', 'originalName', 'referenceNo', 'sizeBytes', 'storagePath', 'storageState', 'type', 'uploadedAt'])
+    expect(stored.storageState).toBe('metadata_only')
     expect(stored.schoolId).toBeUndefined()
     expect(stored.sizeBytes).toBe(14)
     expect(JSON.stringify(stored)).not.toContain('name,roll') // the contents are not kept anywhere
@@ -164,6 +170,6 @@ describe('public upload flow (regression)', () => {
     const r = await repo.list({ ...ALL, search: 'fresh' })
     expect(r.items).toHaveLength(1)
     expect(r.items[0].schoolName).toBeUndefined()
-    expect((await dashboard.get()).counts.uploadedFiles).toBe(5)
+    expect((await dashboard.getCounts()).uploadedFiles).toBe(5)
   })
 })

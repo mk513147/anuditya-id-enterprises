@@ -8,13 +8,15 @@ export interface StudentFilters {
   cls: string
   section: string
   status: NonNullable<StudentListParams['status']>
+  approval: NonNullable<StudentListParams['approval']>
   from: string
   to: string
   page: number
 }
 
 export const DEFAULT_STATUS: StudentFilters['status'] = 'active'
-const KEYS = ['q', 'school', 'cls', 'section', 'status', 'from', 'to', 'page'] as const
+const KEYS = ['q', 'school', 'cls', 'section', 'status', 'approval', 'from', 'to', 'page'] as const
+const APPROVALS = ['pending', 'approved', 'rejected'] as const
 
 /**
  * Filter + pagination state lives in the URL query string, so a filtered view can be bookmarked and
@@ -25,12 +27,14 @@ export function useStudentFilters() {
 
   const filters = useMemo<StudentFilters>(() => {
     const status = params.get('status')
+    const approval = APPROVALS.find((a) => a === params.get('approval')) ?? 'all'
     return {
       q: params.get('q') ?? '',
       school: params.get('school') ?? '',
       cls: params.get('cls') ?? '',
       section: params.get('section') ?? '',
       status: status === 'archived' || status === 'all' ? status : DEFAULT_STATUS,
+      approval,
       from: params.get('from') ?? '',
       to: params.get('to') ?? '',
       page: Math.max(1, Number(params.get('page')) || 1),
@@ -43,7 +47,7 @@ export function useStudentFilters() {
       (prev) => {
         const next = new URLSearchParams(prev)
         for (const [k, v] of Object.entries(patch)) {
-          const empty = v === '' || v === undefined || (k === 'status' && v === DEFAULT_STATUS) || (k === 'page' && v === 1)
+          const empty = v === '' || v === undefined || (k === 'status' && v === DEFAULT_STATUS) || (k === 'approval' && v === 'all') || (k === 'page' && v === 1)
           if (empty) next.delete(k)
           else next.set(k, String(v))
         }
@@ -67,6 +71,7 @@ export const toListParams = (f: StudentFilters, pageSize = 10): StudentListParam
   className: f.cls || undefined,
   section: f.section || undefined,
   status: f.status,
+  approval: f.approval,
   submittedFrom: f.from || undefined,
   submittedTo: f.to || undefined,
   page: f.page,

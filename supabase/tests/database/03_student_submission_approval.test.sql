@@ -59,7 +59,7 @@ select throws_ok($$select * from public.submit_student('d0000000-0000-0000-0000-
 select throws_ok($$select * from public.submit_student('d0000000-0000-0000-0000-000000000001', 'Test Student', 'F', 'M', date '2012-04-12', 'Class 6', 'A', '1', 'X14', '1 Sample Road, Demo Town', '9000000014', 'Z+')$$,
   '23514', null, 'an invalid blood group is rejected');
 select throws_ok($$select * from public.submit_student('d0000000-0000-0000-0000-000000000001', 'Test Student', 'F', 'M', date '2012-04-12', 'Class 6', 'A', '1', 'X15', '1 Sample Road, Demo Town', '9000000014', null, null, null, null, null, '../escape.jpg')$$,
-  '23514', null, 'a photo path that tries to leave its folder is rejected');
+  '22023', 'invalid_photo', 'a photo path that tries to leave its folder is rejected (by submit_student since Phase 3; the CHECK still backs it)');
 select lives_ok($$select * from public.submit_student('d0000000-0000-0000-0000-000000000001', 'Optional Fields', 'F', 'M', date '2012-04-12', 'Class 6', 'A', '1', 'X16', '1 Sample Road, Demo Town', '9000000015', 'O+', 'Red', 'Red', 'R-7', 'Main Gate', null)$$,
   'optional details are accepted');
 reset role;

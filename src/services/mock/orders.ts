@@ -1,8 +1,11 @@
 import { delay } from '@/lib/delay'
 import { ORDER_REFERENCE_PATTERN, normalizeOrderReference } from '@/lib/orderReference'
+import { formatTrackingCode, isWellFormedTrackingCode, normalizeTrackingCode } from '@/lib/trackingCode'
 import { ORDER_STATUSES, type ID, type Order, type OrderStatus, type PublicOrder } from '@/types'
+import { orderInputSchema } from '@/validations/order'
 import { RepositoryError } from '../errors'
 import type { AdminOrder, OrderRepository } from '../types'
+import { parseInput } from '../validate'
 import { db } from './db'
 
 /**
@@ -10,6 +13,21 @@ import { db } from './db'
  * A real repository would reject the same way on a network/database error.
  */
 export const MOCK_ORDER_LOOKUP_FAILURE_REF = 'JOB-FAIL'
+
+/**
+ * DEMO ONLY: the tracking code of every seeded demo order, published on the Job Status page in demo mode so the
+ * prototype can be explored. Real codes are random per order and exist only in the live database (as a hash).
+ */
+export const MOCK_DEMO_TRACKING_CODE = 'DEMQA-TRACK-C2DEX-AMPLE-ABCDE'
+
+/** In-memory codes (canonical form), keyed by order id. Module state like `db`: reset on refresh, never in browser storage. */
+const codes = new Map<ID, string>(db.orders.map((o) => [o.id, normalizeTrackingCode(MOCK_DEMO_TRACKING_CODE)]))
+
+const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function newTrackingCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(25))
+  return formatTrackingCode(Array.from(bytes, (b) => ALPHABET[b & 31]).join(''))
+}
 
 /** Whitelist projection: internal notes, ids and the school id are deliberately left out. */
 const toPublicOrder = (o: Order): PublicOrder => ({
@@ -38,13 +56,50 @@ function findById(id: ID): Order {
 }
 
 export const mockOrderRepository: OrderRepository = {
-  async findByReference(reference) {
+  async track(orderNo, trackingCode) {
     await delay(700)
-    const ref = normalizeOrderReference(reference)
+    const ref = normalizeOrderReference(orderNo)
     if (ref === MOCK_ORDER_LOOKUP_FAILURE_REF) throw new Error('Mock order lookup failure')
-    if (!ORDER_REFERENCE_PATTERN.test(ref)) return null // never match on malformed or empty input
+    // Never match on malformed or empty input; a wrong code and an unknown number look the same.
+    if (!ORDER_REFERENCE_PATTERN.test(ref) || !isWellFormedTrackingCode(trackingCode)) return null
     const order = db.orders.find((o) => o.orderNo.toUpperCase() === ref) // exact match only
-    return order ? toPublicOrder(order) : null
+    if (!order || codes.get(order.id) !== normalizeTrackingCode(trackingCode)) return null
+    return toPublicOrder(order)
+  },
+
+  async create(input) {
+    await delay(500)
+    const v = parseInput(orderInputSchema, { schoolId: '', customer: '', notes: '', ...input }, 'Invalid order.')
+    const school = v.schoolId ? db.schools.find((s) => s.id === v.schoolId) : undefined
+    if (v.schoolId && !school) throw new RepositoryError('not_found', 'School not found.')
+    const year = new Date().getFullYear()
+    const next = Math.max(0, ...db.orders.map((o) => Number(/-(\d+)$/.exec(o.orderNo)?.[1] ?? 0))) + 1
+    const now = new Date().toISOString()
+    const order: Order = {
+      id: crypto.randomUUID(),
+      orderNo: `JOB-${year}-${String(next).padStart(4, '0')}`,
+      schoolId: school?.id,
+      customer: school?.name ?? v.customer,
+      service: v.service,
+      quantity: v.quantity,
+      status: 'Order Received',
+      orderDate: v.orderDate,
+      expectedDelivery: v.expectedDelivery,
+      notes: v.notes || undefined,
+      updatedAt: now,
+    }
+    db.orders.push(order)
+    const trackingCode = newTrackingCode()
+    codes.set(order.id, normalizeTrackingCode(trackingCode))
+    return { order: toAdminOrder(order), trackingCode }
+  },
+
+  async rotateTrackingCode(id) {
+    await delay(400)
+    const order = findById(id)
+    const trackingCode = newTrackingCode()
+    codes.set(order.id, normalizeTrackingCode(trackingCode)) // the previous code stops working
+    return trackingCode
   },
 
   async list({ search = '', status = 'all', from, to, page = 1, pageSize = 10 } = {}) {

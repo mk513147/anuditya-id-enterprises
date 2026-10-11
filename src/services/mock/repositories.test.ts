@@ -23,10 +23,21 @@ describe('school repository', () => {
     expect((await schools.list({ status: 'active' })).length).toBe(4)
   })
 
-  it('lists only active schools for the public dropdown', async () => {
+  it('lists only active schools for the public dropdown, with nothing but id and name', async () => {
     const active = await schools.listActive()
-    expect(active.every((s) => s.isActive)).toBe(true)
-    expect(active.some((s) => s.code === 'MDA-004')).toBe(false)
+    const inactiveId = db.schools.find((s) => s.code === 'MDA-004')!.id
+    expect(active.map((s) => s.id).sort()).toEqual(db.schools.filter((s) => s.isActive).map((s) => s.id).sort())
+    expect(active.some((s) => s.id === inactiveId)).toBe(false)
+    for (const s of active) expect(Object.keys(s).sort()).toEqual(['id', 'name'])
+  })
+
+  it('resolves a school link to id, name and slug only, and tells nothing about an inactive school', async () => {
+    const stm = db.schools.find((s) => s.code === 'STM-001')!
+    const r = await schools.resolveBySlug(stm.slug.toUpperCase())
+    expect(r).toEqual({ status: 'active', school: { id: stm.id, name: stm.name, slug: stm.slug } })
+    const inactive = db.schools.find((s) => !s.isActive)!
+    expect(await schools.resolveBySlug(inactive.slug)).toEqual({ status: 'inactive' })
+    expect(await schools.resolveBySlug('no-such-school')).toEqual({ status: 'not_found' })
   })
 
   it('creates a school, uppercasing the code', async () => {
@@ -107,13 +118,19 @@ describe('student repository', () => {
 
 describe('dashboard repository', () => {
   it('derives every figure from the shared mock tables', async () => {
-    const { counts, recentOrders, recentSchools } = await mockDashboardRepository.get()
+    const [counts, recentOrders, recentSchools] = await Promise.all([
+      mockDashboardRepository.getCounts(),
+      mockDashboardRepository.getRecentOrders(),
+      mockDashboardRepository.getRecentSchools(),
+    ])
     expect(counts.totalSchools).toBe(db.schools.length)
     expect(counts.activeSchools).toBe(db.schools.filter((s) => s.isActive).length)
     expect(counts.totalStudents).toBe(db.students.filter((s) => !s.isArchived).length) // archived students are not counted
     expect(counts.uploadedFiles).toBe(db.files.length)
     expect(counts.pendingOrders).toBe(db.orders.filter((o) => ['Order Received', 'Data Verification'].includes(o.status)).length)
     expect(counts.awaitingCompletion).toBe(db.orders.filter((o) => o.status !== 'Delivered').length)
+    expect(counts.pendingStudentReviews).toBe(db.students.filter((s) => !s.isArchived && s.approvalStatus === 'pending').length)
+    expect(counts.pendingFeedback).toBe(db.feedback.filter((f) => f.status === 'pending').length)
     expect(recentOrders.length).toBeLessThanOrEqual(5)
     expect(recentSchools.length).toBeLessThanOrEqual(4)
   })

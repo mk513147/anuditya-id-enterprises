@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { SectionHeading } from '@/components/shared/SectionHeading'
 import { Button } from '@/components/ui/button'
 import { useApprovedFeedback } from '@/features/feedback/hooks'
+import { dataSource } from '@/services'
 import { TestimonialList } from '@/features/feedback/TestimonialList'
 
 export function TestimonialsSection() {
@@ -14,7 +15,7 @@ export function TestimonialsSection() {
           id="testi-title"
           eyebrow="Customer Feedback"
           title="What schools and colleges say"
-          description="Sample feedback shown for this prototype."
+          description={dataSource === 'mock' ? 'Sample feedback shown for this demo.' : 'Approved feedback from the schools and colleges we work with.'}
           action={
             <Button asChild variant="outline">
               <Link to="/feedback">Share your feedback</Link>

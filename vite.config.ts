@@ -6,6 +6,6 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}'] },
+  test: { environment: 'node', include: ['src/**/*.test.{ts,tsx}', 'supabase/verification/verify-public-api.test.mjs'] },
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
 })

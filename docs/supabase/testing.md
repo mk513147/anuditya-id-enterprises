@@ -71,30 +71,44 @@ local Supabase stack before relying on it.
 
 ## Public API check script (read-only)
 
-`supabase/verification/verify-public-api.mjs` probes the Data API with the anonymous/publishable key only (Node 18+, no dependencies).
-It makes GET reads and POSTs to a fixed allow-list of RPCs, writes nothing, refuses a service-role/secret key, requires HTTPS, and never
-prints the key or any returned row. It has **not been run against the hosted project yet.**
+`supabase/verification/verify-public-api.mjs` probes the Data API with the anonymous/publishable key only (Node 21.7+ for the built-in
+`.env` parser, no dependencies). It makes GET reads, POSTs to a fixed allow-list of **read-only** RPCs and one storage LIST per private
+bucket. It never calls a `submit_*` function, writes nothing, refuses a service-role/secret key, requires HTTPS, and never prints the
+key, the project URL or any returned row. Its own tests run it against a local fake API: `npx vitest run supabase/verification`.
+
+Configuration, per setting (values are never printed; the output says only which NAME each came from):
+
+1. `SUPABASE_URL` / `SUPABASE_ANON_KEY` in the process environment, when supplied (they always win);
+2. otherwise `<repo root>/.env.local`: `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (the app's own names, no renaming needed),
+   or `SUPABASE_URL` / `SUPABASE_ANON_KEY` in that file.
 
 ```
-$env:SUPABASE_URL = "https://<project-ref>.supabase.co"
-$env:SUPABASE_ANON_KEY = <publishable key, entered without echo>
-node supabase\verification\verify-public-api.mjs --check-get-refused
+node supabase/verification/verify-public-api.mjs --check-get-refused
+node supabase/verification/verify-public-api.mjs --check-get-refused --order-no=<an existing order number>
 ```
 
-Verdicts: **PASS** (wanted behaviour observed directly), **FAIL** (private rows returned, or a call that must be denied succeeded),
-**INCONCLUSIVE** (nothing bad seen, but it cannot prove the claim), **UNEXPECTED** (network error or an odd response). Exit code:
-0 all pass, 1 any FAIL, 3 no FAIL but something inconclusive/unexpected, 2 refused to start. HTTP statuses are reported as observations.
+The URL must be the bare origin (no `/rest/v1`, query or fragment). Before any check, a preflight call proves the URL and key form a
+usable configuration; an unreachable host (DNS/TLS/connection), a rejected key or a non-Supabase answer stops the run.
 
-- **Direct table reads** (`students`, `orders`, `profiles`, `uploaded_files`): explicit denial (401/403 or SQLSTATE 42501) is a PASS;
-  private rows are a FAIL; a **successful empty response is INCONCLUSIVE**, because an empty table returns no rows even when SELECT is
-  allowed; a 404, network error or anything else is UNEXPECTED.
-- **Administrator RPCs**: 2xx is a FAIL; explicit denial is a PASS; "function not found" is INCONCLUSIVE (it is consistent with a missing
-  EXECUTE grant but also with migrations not being applied) and is resolved by the function-privilege query below.
-- **`track_order` with invalid credentials** (POST, JSON body): no row is a PASS, but with no orders in the database this cannot show that
-  the secret is enforced (the database tests cover that).
+Verdicts: **PASS** (intended behaviour demonstrated), **FAIL** (private rows returned, or a call that must be denied succeeded),
+**INCONCLUSIVE** (nothing bad seen, but it cannot prove the claim; never a pass), **UNEXPECTED** (network error or an odd response),
+**CONFIGURATION ERROR** (could not start). Exit code: 0 all pass, 1 any FAIL, 3 no FAIL but something inconclusive/unexpected,
+2 configuration error.
+
+- **Direct table reads** (all nine application tables): a permission denial (SQLSTATE 42501, or 401/403 saying "permission denied") is a
+  PASS. A bare 401 is **not** counted as a denial, because an invalid key produces one too. Rows are a FAIL; an empty success is
+  INCONCLUSIVE; "not found" is UNEXPECTED.
+- **Public RPCs** (`list_enabled_services`, `list_active_schools`, `list_published_advertisements`, `list_approved_feedback`): callable, and
+  any column outside the function's public column list is a FAIL. `resolve_school` with a fabricated slug must return one bare `not_found`.
+- **Administrator RPCs** (including `admin_summary`, which exists only after migration 13): success is a FAIL; denial is a PASS; "function not
+  found" is INCONCLUSIVE.
+- **`track_order`** (POST, JSON body, fabricated values only): nothing may be returned for an unknown number, a malformed code or empty
+  values; and the order number alone (no code parameter) must not match any function. Whether a wrong code is refused for a **real** order
+  can only be shown with `--order-no=` (order numbers are not secret); without it that claim is reported INCONCLUSIVE. The correct-code
+  path is covered by the database tests, not by this script.
+- **Storage LIST** of both private buckets: objects listed is a FAIL; an empty list or "bucket not found" is INCONCLUSIVE.
 - **`private.is_admin` probe is preliminary evidence only.** It can only FAIL (a 2xx means the schema looks exposed) or be INCONCLUSIVE.
-  A non-2xx response does not prove the schema is unexposed (it could be a permission error or a missing function); a PGRST106
-  "invalid schema" answer is suggestive. Confirm in Dashboard, Settings, API, Exposed schemas.
+  Confirm in Dashboard, Settings, API, Exposed schemas.
 
 ### Read-only SQL: privilege checks (run in the Dashboard SQL editor; these queries change nothing)
 

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files. The committed template is .env.example; real values never go in git.
+.env
+.env.*
+!.env.example

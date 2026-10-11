@@ -6,6 +6,7 @@ import { AdminNav } from '@/components/admin/AdminNav'
 import { Logo } from '@/components/shared/Logo'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { useAuth } from '@/features/auth/useAuth'
 import { BUSINESS } from '@/lib/business'
 import { useRouteTitle } from './routeHandle'
 
@@ -21,6 +22,7 @@ function AdminBrand() {
 export function AdminLayout() {
   const title = useRouteTitle('Admin')
   const navigate = useNavigate()
+  const { snapshot, logout: signOut } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
 
   // The admin area is not for search engines.
@@ -32,10 +34,10 @@ export function AdminLayout() {
     return () => meta.remove()
   }, [])
 
-  const logout = () => {
-    // Prototype: there is no session to end yet. Real sign-out arrives with authentication.
-    toast.info('Signed out (demo). Real authentication is not built yet.')
-    navigate('/login')
+  const logout = async () => {
+    await signOut() // ends the Supabase session and drops cached admin data
+    toast.info('You have signed out.')
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -78,12 +80,11 @@ export function AdminLayout() {
           <h1 className="min-w-0 flex-1 truncate font-display text-lg font-extrabold text-navy-900 sm:text-xl">{title}</h1>
 
           <div className="flex items-center gap-2">
-            {/* Placeholder until real authentication exists */}
-            <div className="flex items-center gap-2 rounded-full bg-royal-50 py-1 pl-1 pr-1 sm:pr-3" title="Administrator (placeholder)">
+            <div className="flex items-center gap-2 rounded-full bg-royal-50 py-1 pl-1 pr-1 sm:pr-3" title={snapshot.email ? `Signed in as ${snapshot.email}` : 'Administrator'}>
               <span aria-hidden className="grid size-8 place-items-center rounded-full bg-royal-600 text-xs font-bold text-white">AD</span>
               <span className="hidden text-sm font-semibold text-navy-900 sm:block">Administrator</span>
             </div>
-            <Button variant="outline" size="sm" className="h-11 sm:px-4" onClick={logout} aria-label="Log out">
+            <Button variant="outline" size="sm" className="h-11 sm:px-4" onClick={() => void logout()} aria-label="Log out">
               <LogOut aria-hidden />
               <span className="hidden sm:inline">Logout</span>
             </Button>

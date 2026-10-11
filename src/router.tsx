@@ -1,16 +1,17 @@
 import { createBrowserRouter } from 'react-router-dom'
+import { RequireAdmin } from '@/features/auth/RequireAdmin'
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { PublicLayout } from '@/layouts/PublicLayout'
 import { HomePage } from '@/pages/HomePage'
 import { FileUploadPage } from '@/pages/FileUploadPage'
 import { JobStatusPage } from '@/pages/JobStatusPage'
+import { LoginPage } from '@/pages/LoginPage'
 import { AdvertisementPage } from '@/pages/AdvertisementPage'
 import { FeedbackPage } from '@/pages/FeedbackPage'
 import { StudentFormPage } from '@/pages/StudentFormPage'
 import { SchoolSubmissionPage } from '@/pages/SchoolSubmissionPage'
 import { ServicesPage } from '@/pages/ServicesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
-import { PlaceholderPage } from '@/pages/PlaceholderPage'
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
 import { AdminAdvertisementsPage } from '@/pages/admin/AdminAdvertisementsPage'
 import { AdminFeedbackPage } from '@/pages/admin/AdminFeedbackPage'
@@ -22,8 +23,6 @@ import { AdminStudentDetailPage } from '@/pages/admin/AdminStudentDetailPage'
 import { AdminStudentsPage } from '@/pages/admin/AdminStudentsPage'
 import { AdminSchoolDetailPage } from '@/pages/admin/AdminSchoolDetailPage'
 import { AdminSchoolsPage } from '@/pages/admin/AdminSchoolsPage'
-
-const page = (title: string) => <PlaceholderPage title={title} />
 
 export const router = createBrowserRouter([
   {
@@ -39,13 +38,19 @@ export const router = createBrowserRouter([
       { path: '/services', element: <ServicesPage /> },
       { path: '/advertisement', element: <AdvertisementPage /> },
       { path: '/feedback', element: <FeedbackPage /> },
-      { path: '/login', element: page('Login') },
+      { path: '/login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
   {
     path: '/admin',
-    element: <AdminLayout />,
+    // The admin area stays closed until the signed-in user's administrator role is verified (a UI gate;
+    // the database enforces the real permissions).
+    element: (
+      <RequireAdmin>
+        <AdminLayout />
+      </RequireAdmin>
+    ),
     children: [
       { index: true, element: <AdminDashboardPage />, handle: { title: 'Dashboard' } },
       { path: 'schools', element: <AdminSchoolsPage />, handle: { title: 'Schools' } },

@@ -11,15 +11,19 @@ import { SchoolSubmissionPage } from '@/pages/SchoolSubmissionPage'
 import { ServicesPage } from '@/pages/ServicesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { PlaceholderPage } from '@/pages/PlaceholderPage'
-import { AdminComingSoon } from '@/pages/admin/AdminComingSoon'
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
+import { AdminAdvertisementsPage } from '@/pages/admin/AdminAdvertisementsPage'
+import { AdminFeedbackPage } from '@/pages/admin/AdminFeedbackPage'
+import { AdminFilesPage } from '@/pages/admin/AdminFilesPage'
+import { AdminOrderDetailPage } from '@/pages/admin/AdminOrderDetailPage'
+import { AdminOrdersPage } from '@/pages/admin/AdminOrdersPage'
+import { AdminServicesPage } from '@/pages/admin/AdminServicesPage'
 import { AdminStudentDetailPage } from '@/pages/admin/AdminStudentDetailPage'
 import { AdminStudentsPage } from '@/pages/admin/AdminStudentsPage'
 import { AdminSchoolDetailPage } from '@/pages/admin/AdminSchoolDetailPage'
 import { AdminSchoolsPage } from '@/pages/admin/AdminSchoolsPage'
 
 const page = (title: string) => <PlaceholderPage title={title} />
-const soon = (section: string) => <AdminComingSoon section={section} />
 
 export const router = createBrowserRouter([
   {
@@ -48,11 +52,12 @@ export const router = createBrowserRouter([
       { path: 'schools/:schoolId', element: <AdminSchoolDetailPage />, handle: { title: 'School Details' } },
       { path: 'students', element: <AdminStudentsPage />, handle: { title: 'Students' } },
       { path: 'students/:studentId', element: <AdminStudentDetailPage />, handle: { title: 'Student Details' } },
-      { path: 'orders', element: soon('Order'), handle: { title: 'Orders' } },
-      { path: 'files', element: soon('File'), handle: { title: 'Files' } },
-      { path: 'advertisements', element: soon('Advertisement'), handle: { title: 'Advertisements' } },
-      { path: 'feedback', element: soon('Feedback'), handle: { title: 'Feedback' } },
-      { path: 'services', element: soon('Service'), handle: { title: 'Services' } },
+      { path: 'orders', element: <AdminOrdersPage />, handle: { title: 'Orders' } },
+      { path: 'orders/:orderId', element: <AdminOrderDetailPage />, handle: { title: 'Order Details' } },
+      { path: 'files', element: <AdminFilesPage />, handle: { title: 'Files' } },
+      { path: 'advertisements', element: <AdminAdvertisementsPage />, handle: { title: 'Advertisements' } },
+      { path: 'feedback', element: <AdminFeedbackPage />, handle: { title: 'Feedback' } },
+      { path: 'services', element: <AdminServicesPage />, handle: { title: 'Services' } },
     ],
   },
 ])

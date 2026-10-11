@@ -1,7 +1,9 @@
 import { delay } from '@/lib/delay'
-import type { UploadedFile, UploadedFileType } from '@/types'
-import { getExtension } from '@/validations/upload'
-import type { FileRepository } from '../types'
+import { localDateISO } from '@/lib/format'
+import type { ID, UploadedFile, UploadedFileType } from '@/types'
+import { ACCEPTED_EXTENSIONS, getExtension, isAcceptedExtension } from '@/validations/upload'
+import { RepositoryError } from '../errors'
+import type { AdminFile, FileRepository } from '../types'
 import { db, pad5 } from './db'
 
 /**
@@ -10,6 +12,15 @@ import { db, pad5 } from './db'
  * A real repository would reject the same way on a storage/network error.
  */
 export const MOCK_FAILURE_FILENAME_TOKEN = 'FAIL'
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Joins the school by id (falling back to the stored display name) and drops the private storage path. */
+function toAdminFile(f: UploadedFile): AdminFile {
+  const { storagePath: _storagePath, customer, ...rest } = f
+  const school = f.schoolId ? db.schools.find((s) => s.id === f.schoolId) : undefined
+  return { ...rest, schoolName: school?.name ?? customer }
+}
 
 export const mockFileRepository: FileRepository = {
   async upload(file, { onProgress }) {
@@ -46,5 +57,47 @@ export const mockFileRepository: FileRepository = {
       sizeBytes: record.sizeBytes,
       uploadedAt: record.uploadedAt,
     }
+  },
+
+  async list({ search = '', schoolId, type = 'all', from, to, page = 1, pageSize = 10 } = {}) {
+    await delay(250)
+    // Validated here too: this is what a real backend must enforce independently of the UI.
+    if (type !== 'all' && !isAcceptedExtension(type)) throw new RepositoryError('invalid_filter', 'That file type is not supported.')
+    for (const d of [from, to]) if (d && (!DATE_ONLY.test(d) || Number.isNaN(Date.parse(d)))) throw new RepositoryError('invalid_filter', 'Dates must be real calendar dates.')
+    if (from && to && from > to) throw new RepositoryError('invalid_filter', 'The "from" date must not be after the "to" date.')
+
+    const q = search.trim().toLowerCase()
+    const matches = db.files
+      .filter((f) => type === 'all' || f.type === type)
+      .filter((f) => !schoolId || (schoolId === 'none' ? !f.schoolId : f.schoolId === schoolId))
+      .filter((f) => {
+        if (!from && !to) return true
+        const day = localDateISO(f.uploadedAt)
+        return (!from || day >= from) && (!to || day <= to)
+      })
+      .filter((f) => !q || f.originalName.toLowerCase().includes(q) || f.referenceNo.toLowerCase().includes(q))
+      .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt) || b.referenceNo.localeCompare(a.referenceNo))
+
+    const total = matches.length
+    const size = Math.max(1, pageSize)
+    const totalPages = Math.max(1, Math.ceil(total / size))
+    const current = Math.min(Math.max(1, page), totalPages)
+    const byType = Object.fromEntries(ACCEPTED_EXTENSIONS.map((t) => [t, db.files.filter((f) => f.type === t).length])) as Record<UploadedFileType, number>
+    return {
+      items: matches.slice((current - 1) * size, current * size).map(toAdminFile),
+      total,
+      page: current,
+      pageSize: size,
+      totalPages,
+      counts: { total: db.files.length, totalBytes: db.files.reduce((n, f) => n + f.sizeBytes, 0), byType },
+    }
+  },
+
+  async getDetail(id: ID) {
+    await delay(250)
+    if (typeof id !== 'string' || id.trim() === '') throw new RepositoryError('invalid_id', 'A file id is required.')
+    const file = db.files.find((f) => f.id === id)
+    if (!file) throw new RepositoryError('not_found', 'File not found.')
+    return toAdminFile(file)
   },
 }

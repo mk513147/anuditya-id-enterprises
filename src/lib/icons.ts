@@ -40,4 +40,6 @@ const ICONS: Record<string, LucideIcon> = {
   truck: Truck,
 }
 
+export const isKnownIcon = (key: string) => key in ICONS
+
 export const getIcon = (key: string): LucideIcon => ICONS[key] ?? IdCard

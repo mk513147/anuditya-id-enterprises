@@ -82,6 +82,12 @@ export const ORDER_STATUSES = [
 ] as const
 export type OrderStatus = (typeof ORDER_STATUSES)[number]
 
+/** One recorded status change. Seeded demo orders start with none; only real changes are recorded. */
+export interface OrderStatusChange {
+  status: OrderStatus
+  at: ISODate
+}
+
 export interface Order {
   id: ID
   orderNo: string
@@ -95,6 +101,10 @@ export interface Order {
   expectedDelivery: ISODate
   /** Internal notes. Never exposed by the public tracking lookup. */
   notes?: string
+  /** Status changes made through the admin panel, oldest first. Internal: never exposed publicly. */
+  statusHistory?: OrderStatusChange[]
+  /** Set whenever an admin changes the status. */
+  updatedAt?: ISODate
 }
 
 /**
@@ -141,6 +151,9 @@ export interface Service {
   order: number
 }
 
+/** The fields an admin controls. id, slug and display order are assigned by the data layer. */
+export type ServiceInput = Pick<Service, 'title' | 'tagline' | 'category' | 'description' | 'image' | 'icon' | 'enabled'>
+
 export interface Advertisement {
   id: ID
   title: string
@@ -159,6 +172,12 @@ export interface Advertisement {
   endsAt?: ISODate
   featured: boolean
 }
+
+/** The fields an admin controls. Everything else on an Advertisement (its id) is assigned by the data layer. */
+export type AdvertisementInput = Pick<
+  Advertisement,
+  'title' | 'description' | 'offer' | 'image' | 'icon' | 'whatsappMessage' | 'active' | 'isPublished' | 'featured' | 'startsAt' | 'endsAt'
+>
 
 export type FeedbackStatus = 'pending' | 'approved' | 'rejected'
 export interface Feedback {

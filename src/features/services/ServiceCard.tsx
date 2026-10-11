@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from 'motion/react'
-import { createElement } from 'react'
+import { createElement, useState } from 'react'
 import { PlaceholderArt } from '@/components/shared/PlaceholderArt'
 import { WhatsAppButton } from '@/components/shared/WhatsAppButton'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,9 @@ export function ServiceCard({ service, index = 0, variant = 'compact' }: Props) 
   const { openQuote } = useQuote()
   const reduce = useReducedMotion()
   const detailed = variant === 'detailed'
+  // An admin can enter any image link, so a link that fails to load falls back to the branded placeholder.
+  const [imageFailed, setImageFailed] = useState(false)
+  const image = service.image && !imageFailed ? service.image : undefined
 
   return (
     <motion.article
@@ -31,9 +34,10 @@ export function ServiceCard({ service, index = 0, variant = 'compact' }: Props) 
       className="group flex h-full flex-col overflow-hidden rounded-[var(--radius-card)] border bg-white shadow-card transition-shadow focus-within:shadow-card-hover hover:shadow-card-hover"
     >
       <div className="relative aspect-[4/3] overflow-hidden">
-        {service.image ? (
+        {image ? (
           <img
-            src={service.image}
+            src={image}
+            onError={() => setImageFailed(true)}
             alt={service.title}
             loading="lazy"
             className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -42,7 +46,7 @@ export function ServiceCard({ service, index = 0, variant = 'compact' }: Props) 
           <PlaceholderArt icon={service.icon} variant={index} className="size-full transition-transform duration-500 group-hover:scale-105" />
         )}
         {/* With a real photo the placeholder icon is gone, so keep a small icon chip for recognition. */}
-        {service.image && (
+        {image && (
           <span aria-hidden className="absolute bottom-3 left-3 grid size-9 place-items-center rounded-xl bg-navy-900/85 text-gold-400 ring-1 ring-white/20 backdrop-blur-sm">
             {createElement(getIcon(service.icon), { className: 'size-5' })}
           </span>

@@ -3,8 +3,9 @@ import { FEEDBACK_DATA } from '@/data/feedback'
 import { FILES_DATA } from '@/data/files'
 import { ORDERS_DATA } from '@/data/orders'
 import { SCHOOLS_DATA } from '@/data/schools'
+import { SERVICES_DATA } from '@/data/services'
 import { STUDENTS_DATA } from '@/data/students'
-import type { Advertisement, Feedback, Order, School, Student, UploadedFile } from '@/types'
+import type { Advertisement, Feedback, Order, School, Service, Student, UploadedFile } from '@/types'
 
 /**
  * The prototype's in-memory "database", shared by every mock repository so that, for example,
@@ -17,6 +18,7 @@ export const db = {
   schools: SCHOOLS_DATA.map((s): School => ({ ...s })),
   students: STUDENTS_DATA.map((s): Student => ({ ...s })),
   orders: ORDERS_DATA.map((o): Order => ({ ...o })),
+  services: SERVICES_DATA.map((s): Service => ({ ...s })),
   files: FILES_DATA.map((f): UploadedFile => ({ ...f })),
   advertisements: ADVERTISEMENTS_DATA.map((a): Advertisement => ({ ...a })),
   feedback: FEEDBACK_DATA.map((f): Feedback => ({ ...f })),

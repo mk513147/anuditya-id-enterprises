@@ -16,6 +16,7 @@ export function createSupabaseDashboardRepository(client: Client | null): Dashbo
         pendingStudentReviews: s.students.pending,
         pendingOrders: (by['Order Received'] ?? 0) + (by['Data Verification'] ?? 0),
         uploadedFiles: s.files.total,
+        pendingFileReviews: s.files.pendingReview ?? 0,
         awaitingCompletion: s.orders.total - (by.Delivered ?? 0),
         pendingFeedback: s.feedback.pending,
       }

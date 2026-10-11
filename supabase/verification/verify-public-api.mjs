@@ -56,11 +56,11 @@ const baseUrl = checked.origin
 const apiKey = cfg.key
 
 // ---------------------------------------------------------------------------------------------------- safe HTTP
-const READ_TABLES = ['students', 'orders', 'profiles', 'uploaded_files', 'schools', 'order_status_history', 'services', 'advertisements', 'feedback']
+const READ_TABLES = ['students', 'orders', 'profiles', 'uploaded_files', 'uploaded_file_reviews', 'schools', 'order_status_history', 'services', 'advertisements', 'feedback']
 // Every POST must target one of these read-only RPCs. No submit_* or other writing function can be called by accident.
 const RPC_ALLOW = new Set([
   'list_enabled_services', 'list_active_schools', 'list_published_advertisements', 'list_approved_feedback', 'resolve_school',
-  'admin_create_order', 'admin_review_student', 'admin_rotate_tracking_code', 'admin_set_order_status', 'admin_summary',
+  'admin_create_order', 'admin_review_student', 'admin_rotate_tracking_code', 'admin_set_order_status', 'admin_summary', 'admin_review_file',
   'track_order', 'is_admin',
 ])
 const STORAGE_LIST_ALLOW = new Set(['student-photos', 'school-uploads'])
@@ -218,6 +218,7 @@ const adminCalls = [
   ['admin_rotate_tracking_code', { p_order_id: NIL_UUID }],
   ['admin_set_order_status', { p_order_id: NIL_UUID, p_status: 'Printing' }],
   ['admin_summary', {}],
+  ['admin_review_file', { p_file_id: NIL_UUID, p_status: 'approved', p_notes: null }],
 ]
 for (const [fn, body] of adminCalls) {
   const r = await send('POST', `/rest/v1/rpc/${fn}`, { body })
@@ -226,7 +227,8 @@ for (const [fn, body] of adminCalls) {
   else if (is2xx(r)) report('FAIL', name, r, 'THE ANONYMOUS CALL SUCCEEDED.')
   else if (isDenied(r)) report('PASS', name, r, 'explicitly denied (insufficient privilege).')
   else if (isNotFound(r)) {
-    const note = fn === 'admin_summary' ? ' admin_summary is added by migration 20261012090001; "not found" is expected until it is applied.' : ''
+    const note = fn === 'admin_summary' ? ' admin_summary is added by migration 20261012090001; "not found" is expected until it is applied.'
+      : fn === 'admin_review_file' ? ' admin_review_file is added by migration 20261013090001; "not found" is expected until it is applied.' : ''
     report('INCONCLUSIVE', name, r, `function not found for this caller. Consistent with a missing EXECUTE grant, but equally with the migration not being applied or the arguments not matching, so it does not prove denial.${note} Use the has_function_privilege query in docs/supabase/testing.md.`)
   } else report('UNEXPECTED', name, r, 'rejected, but not as a clear permission denial.')
 }

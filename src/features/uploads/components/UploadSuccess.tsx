@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { copyText } from '@/lib/clipboard'
 import { formatBytes, formatDateTime } from '@/lib/format'
 import { waMessages } from '@/lib/whatsapp'
+import { dataSource } from '@/services'
 import type { FileUploadResult } from '@/types'
 import { FILE_TYPE_LABEL } from '@/validations/upload'
 
@@ -31,6 +32,7 @@ export function UploadSuccess({ result, onReset }: { result: FileUploadResult; o
   }
 
   const rows = [
+    ...(result.schoolName ? [['School', result.schoolName]] : []),
     ['File name', result.originalName],
     ['File type', FILE_TYPE_LABEL[result.type]],
     ['File size', formatBytes(result.sizeBytes)],
@@ -49,9 +51,11 @@ export function UploadSuccess({ result, onReset }: { result: FileUploadResult; o
           <CheckCircle2 className="size-9" aria-hidden />
         </motion.span>
         <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-balance text-2xl font-extrabold outline-none sm:text-3xl">
-          File uploaded successfully.
+          File submitted for review.
         </h2>
-        <p className="mt-2 text-sm text-muted-ink">Your Upload Reference ID is:</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-ink">
+          Our team will review the file and contact you using the details you gave if anything is unclear. Your reference ID is:
+        </p>
         <p className="mx-auto mt-2 w-fit max-w-full rounded-2xl border-2 border-dashed border-royal-500/40 bg-royal-50 px-5 py-3 font-display text-2xl font-extrabold tracking-wide text-navy-900 sm:text-3xl">
           <span className="break-all" data-testid="upload-ref">{result.referenceNo}</span>
         </p>
@@ -72,14 +76,16 @@ export function UploadSuccess({ result, onReset }: { result: FileUploadResult; o
           {copied ? 'Copied' : 'Copy Reference ID'}
         </Button>
         <Button size="lg" variant="outline" onClick={onReset}>
-          <RotateCcw aria-hidden /> Upload Another File
+          <RotateCcw aria-hidden /> Submit Another File
         </Button>
         <WhatsAppButton size="lg" label="WhatsApp Us" message={waMessages.fileUploaded(result.referenceNo)} />
       </div>
 
-      <p className="mx-auto mt-5 max-w-md rounded-xl bg-gold-100 px-4 py-3 text-xs leading-relaxed text-navy-900">
-        <strong>Prototype notice:</strong> this upload is simulated. The file is not stored permanently and the details above will be cleared when the page is refreshed.
-      </p>
+      {dataSource === 'mock' && (
+        <p className="mx-auto mt-5 max-w-md rounded-xl bg-gold-100 px-4 py-3 text-xs leading-relaxed text-navy-900">
+          <strong>Demo notice:</strong> this submission is simulated. The file is not stored and the details above will be cleared when the page is refreshed.
+        </p>
+      )}
     </div>
   )
 }

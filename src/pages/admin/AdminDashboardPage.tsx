@@ -67,7 +67,7 @@ export function AdminDashboardPage() {
           <StatCard loading={loading} label="Submissions to review" value={c?.pendingStudentReviews} icon="file-pen" tone="orange" hint="Waiting for approval" to="/admin/students?approval=pending" />
           <StatCard loading={loading} label="Pending orders" value={c?.pendingOrders} icon="timer" tone="orange" hint="Received or in data verification" to="/admin/orders" />
           <StatCard loading={loading} label="Awaiting completion" value={c?.awaitingCompletion} icon="orders" tone="blue" hint="Orders not yet delivered" to="/admin/orders" />
-          <StatCard loading={loading} label="Uploaded files" value={c?.uploadedFiles} icon="files" tone="gold" to="/admin/files" />
+          <StatCard loading={loading} label="Files to review" value={c?.pendingFileReviews} icon="files" tone="gold" hint={c ? `${c.uploadedFiles} files in total` : undefined} to="/admin/files?review=pending" />
           <StatCard loading={loading} label="Feedback to moderate" value={c?.pendingFeedback} icon="message" tone="purple" hint="Waiting for a decision" to="/admin/feedback" />
         </section>
       )}

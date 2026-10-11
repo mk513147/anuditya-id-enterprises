@@ -1,6 +1,6 @@
 -- Phase 3: insert-only public uploads, registering uploads, photo validation on submission, and the admin summary.
 begin;
-select plan(41);
+select plan(42);
 
 insert into auth.users (id, email) values
   ('a0000000-0000-0000-0000-000000000001', 'admin@example.invalid'),
@@ -26,6 +26,11 @@ with u as (update storage.objects set name = 'submissions/11111111-1111-4111-811
 with d as (delete from storage.objects returning 1) select is((select count(*) from d)::int, 0, 'anon cannot delete an object');
 
 -- ------------------------------------------------------------------ registering a spreadsheet upload
+-- Migration 20261013090001 withdrew submit_file_upload from client roles (superseded by submit_school_file, which also
+-- requires the submission details). Its own checks are still exercised below as the function owner.
+select throws_ok($$select * from public.submit_file_upload('incoming/22222222-2222-4222-8222-222222222222.csv', 'x.csv')$$, '42501', null,
+  'anon can no longer call the superseded submit_file_upload');
+reset role;
 select is((select reference_no ~ '^FILE-[0-9]{4}-[0-9]{5}$' from public.submit_file_upload('incoming/22222222-2222-4222-8222-222222222222.csv', 'Class 9 list.csv')), true,
   'a real upload is registered and gets a FILE- reference');
 select throws_ok($$select * from public.submit_file_upload('incoming/22222222-2222-4222-8222-222222222222.csv', 'again.csv')$$, '23505', null, 'the same object cannot be registered twice');
@@ -36,9 +41,9 @@ reset role;
 insert into storage.objects (bucket_id, name, metadata) values
   ('school-uploads', 'incoming/88888888-8888-4888-8888-888888888888.csv', null),
   ('school-uploads', 'incoming/99999999-9999-4999-8999-999999999999.csv', '{"size": 10, "mimetype": "text/html"}');
-set local role anon;
 select throws_ok($$select * from public.submit_file_upload('incoming/88888888-8888-4888-8888-888888888888.csv', 'a.csv')$$, 'P0001', 'file_not_uploaded', 'an object with no recorded metadata is treated as not uploaded (fail closed)');
 select throws_ok($$select * from public.submit_file_upload('incoming/99999999-9999-4999-8999-999999999999.csv', 'b.csv')$$, '22023', 'invalid_file', 'an object whose stored type is not a spreadsheet type is refused');
+set local role anon;
 select throws_ok($$select * from public.uploaded_files$$, '42501', null, 'anon still cannot read file records');
 reset role;
 select is((select storage_state || '|' || storage_bucket || '|' || size_bytes from public.uploaded_files), 'stored|school-uploads|2048', 'the record says stored, with the real bucket and the size reported by storage');

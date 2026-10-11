@@ -14,6 +14,7 @@ export const mockDashboardRepository: DashboardRepository = {
       pendingStudentReviews: students.filter((s) => !s.isArchived && s.approvalStatus === 'pending').length,
       pendingOrders: orders.filter((o) => o.status === 'Order Received' || o.status === 'Data Verification').length,
       uploadedFiles: files.length,
+      pendingFileReviews: files.filter((f) => f.reviewStatus === 'pending').length,
       awaitingCompletion: orders.filter((o) => o.status !== 'Delivered').length,
       pendingFeedback: feedback.filter((f) => f.status === 'pending').length,
     }

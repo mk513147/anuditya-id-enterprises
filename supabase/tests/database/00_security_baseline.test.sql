@@ -16,7 +16,7 @@ select is(
 
 select is(
   (select count(*) from pg_tables where schemaname = 'public')::int,
-  9, 'exactly the nine expected tables exist (a new table must be reviewed and added to this test)');
+  10, 'exactly the ten expected tables exist (a new table must be reviewed and added to this test)');
 
 -- Anonymous role: no direct table or column access at all -------------------------------------------------------------
 select is(
@@ -37,12 +37,12 @@ select is(
 select is(
   (select count(*) from information_schema.role_table_grants
     where grantee = 'authenticated' and table_schema = 'public' and privilege_type = 'INSERT'
-      and table_name in ('profiles', 'students', 'orders', 'order_status_history', 'uploaded_files', 'feedback'))::int,
+      and table_name in ('profiles', 'students', 'orders', 'order_status_history', 'uploaded_files', 'uploaded_file_reviews', 'feedback'))::int,
   0, 'authenticated cannot INSERT into profiles, students, orders, history, files or feedback');
 select is(
   (select count(*) from information_schema.role_table_grants
     where grantee = 'authenticated' and table_schema = 'public' and privilege_type = 'UPDATE'
-      and table_name in ('profiles', 'orders', 'order_status_history', 'uploaded_files'))::int,
+      and table_name in ('profiles', 'orders', 'order_status_history', 'uploaded_files', 'uploaded_file_reviews'))::int,
   0, 'authenticated cannot UPDATE profiles, orders, history or file records directly');
 select is(
   (select count(*) from information_schema.column_privileges
@@ -64,13 +64,13 @@ select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),
   array['list_active_schools', 'list_approved_feedback', 'list_enabled_services', 'list_published_advertisements',
-        'resolve_school', 'submit_feedback', 'submit_file_upload', 'submit_student', 'track_order'],
+        'resolve_school', 'submit_feedback', 'submit_school_file', 'submit_student', 'track_order'],
   'anon can execute exactly the nine intended public functions');
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname like 'admin\_%' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['admin_create_order', 'admin_review_student', 'admin_rotate_tracking_code', 'admin_set_order_status', 'admin_summary'],
-  'authenticated can execute the five administrator functions (each re-checks is_admin)');
+  array['admin_create_order', 'admin_review_file', 'admin_review_student', 'admin_rotate_tracking_code', 'admin_set_order_status', 'admin_summary'],
+  'authenticated can execute the six administrator functions (each re-checks is_admin)');
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname like 'admin\_%' and has_function_privilege('anon', p.oid, 'execute'))::int,

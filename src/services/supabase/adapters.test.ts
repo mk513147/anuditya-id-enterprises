@@ -16,7 +16,8 @@ const SUMMARY = {
   students: { total: 20, notArchived: 18, archived: 2, pending: 3, approved: 14, rejected: 1 },
   studentSections: ['A', 'B'],
   orders: { total: 9, byStatus: { 'Order Received': 2, 'Data Verification': 1, Designing: 1, Printing: 1, 'Quality Check': 1, Ready: 1, Dispatched: 1, Delivered: 1 } },
-  files: { total: 4, totalBytes: 1000, stored: 1, byType: { xlsx: 2, xls: 1, csv: 1 } },
+  files: { total: 4, totalBytes: 1000, stored: 1, byType: { xlsx: 2, xls: 1, csv: 1 }, pendingReview: 2, byReview: { pending: 2, approved: 1, rejected: 0, corrections_required: 1 } },
+  storage: { unregisteredUploads: 0 },
   services: { total: 3, enabled: 2, disabled: 1, byCategory: { 'id-cards': 1, 'school-materials': 1, 'design-printing': 1 } },
   advertisements: { total: 0, live: 0, scheduled: 0, ended: 0, hidden: 0, drafts: 0, disabled: 0 },
   feedback: { total: 6, pending: 2, approved: 3, rejected: 1 },
@@ -311,32 +312,141 @@ describe('admin lists: explicit columns, filters and pagination', () => {
   })
 })
 
-describe('files: private storage', () => {
-  it('uploads into incoming/<uuid>.<ext> with the bucket MIME type, then registers through submit_file_upload', async () => {
+describe('files: school data submissions in private storage', () => {
+  const SUBMISSION = {
+    schoolId: UUID2, contactPerson: ' Asha Teacher ', contactDetails: '+91 98765 43210', category: 'student_data' as const,
+    description: 'Student list for the 2026-27 session, Class 10, for ID card printing.',
+  }
+  const REGISTERED = { reference_no: 'FILE-2026-00009', original_name: 'Class 9.csv', file_type: 'csv', size_bytes: 3, uploaded_at: 'now', school_name: 'S' }
+  const csv = (name = 'Class 9.csv') => new File(['a,b'], name, { type: '' })
+  /** Active-school list contains the school; registration succeeds. */
+  const happy: Responder = (c) =>
+    c.target === 'list_active_schools' ? { data: [{ id: UUID2, name: 'S' }] } : c.target === 'submit_school_file' ? { data: [REGISTERED] } : undefined
+
+  it('checks the school, uploads into incoming/<uuid>.<ext> with the bucket MIME type, then registers through submit_school_file', async () => {
     const progress: number[] = []
-    const { repos, calls } = setup((c) =>
-      c.kind === 'rpc' ? { data: [{ reference_no: 'FILE-2026-00009', original_name: 'Class 9.csv', file_type: 'csv', size_bytes: 3, uploaded_at: 'now' }] } : undefined,
-    )
-    const file = new File(['a,b'], 'Class 9.csv', { type: '' })
-    expect(await repos.fileRepository.upload(file, { onProgress: (p) => progress.push(p) })).toEqual({
-      referenceNo: 'FILE-2026-00009', originalName: 'Class 9.csv', type: 'csv', sizeBytes: 3, uploadedAt: 'now',
+    const { repos, calls } = setup(happy)
+    expect(await repos.fileRepository.submit({ ...SUBMISSION, file: csv(), instructions: '  ' }, { onProgress: (p) => progress.push(p) })).toEqual({
+      referenceNo: 'FILE-2026-00009', originalName: 'Class 9.csv', type: 'csv', sizeBytes: 3, uploadedAt: 'now', schoolName: 'S',
     })
-    const upload = calls[0].args as { path: string; options: { contentType: string; upsert: boolean } }
-    expect(calls[0].target).toBe('school-uploads')
+    expect(calls.map((c) => `${c.kind}:${c.target}`)).toEqual(['rpc:list_active_schools', 'upload:school-uploads', 'rpc:submit_school_file'])
+    const upload = calls[1].args as { path: string; options: { contentType: string; upsert: boolean } }
     expect(upload.path).toMatch(/^incoming\/[0-9a-f-]{36}\.csv$/)
+    expect(upload.path).not.toContain('Class')
     expect(upload.options).toMatchObject({ contentType: 'text/csv', upsert: false })
-    expect(calls[1]).toMatchObject({ kind: 'rpc', target: 'submit_file_upload', args: { p_storage_path: upload.path, p_original_name: 'Class 9.csv' } })
+    expect(calls[2].args).toEqual({
+      p_school_id: UUID2, p_contact_person: 'Asha Teacher', p_contact_details: '9876543210', p_category: 'student_data',
+      p_description: SUBMISSION.description, p_storage_path: upload.path, p_original_name: 'Class 9.csv', p_instructions: null,
+    })
+    expect(Object.keys(calls[2].args as object).some((k) => /status|review|notes|bucket/.test(k))).toBe(false) // the browser cannot choose the review state
     expect(progress.at(-1)).toBe(100)
   })
 
-  it('refuses a disallowed file before uploading anything', async () => {
-    const { repos, calls } = setup()
+  it('refuses invalid fields or a disallowed file before any request', async () => {
+    const { repos, calls } = setup(happy)
     const exe = new File(['MZ'], 'virus.exe', { type: 'application/x-msdownload' })
-    expect(isRepositoryError(await rejection(repos.fileRepository.upload(exe, { onProgress: () => {} })), 'invalid_input')).toBe(true)
+    let e = await rejection(repos.fileRepository.submit({ ...SUBMISSION, file: exe }, { onProgress: () => {} }))
+    expect(isRepositoryError(e, 'invalid_input')).toBe(true)
+    expect((e as RepositoryError).fieldErrors).toHaveProperty('file')
+    e = await rejection(repos.fileRepository.submit({ ...SUBMISSION, contactDetails: 'nope', file: csv() }, { onProgress: () => {} }))
+    expect((e as RepositoryError).fieldErrors).toHaveProperty('contactDetails')
+    e = await rejection(repos.fileRepository.submit({ ...SUBMISSION, file: new File(['not a zip'], 'fake.xlsx') }, { onProgress: () => {} }))
+    expect((e as RepositoryError).fieldErrors).toHaveProperty('file')
     expect(calls).toHaveLength(0)
   })
 
-  it('a download link is short-lived, and a metadata-only record has none', async () => {
+  it('an inactive school is refused before anything is uploaded', async () => {
+    const { repos, calls } = setup((c) => (c.target === 'list_active_schools' ? { data: [] } : undefined))
+    expect(isRepositoryError(await rejection(repos.fileRepository.submit({ ...SUBMISSION, file: csv() }, { onProgress: () => {} })), 'school_unavailable')).toBe(true)
+    expect(calls.map((c) => c.kind)).toEqual(['rpc'])
+  })
+
+  it('a storage failure stops before registration and is never reported as success', async () => {
+    const { repos, calls } = setup((c) => (c.kind === 'upload' ? { error: { statusCode: '413', message: 'Payload too large' } } : happy(c)))
+    expect(await rejection(repos.fileRepository.submit({ ...SUBMISSION, file: csv() }, { onProgress: () => {} }))).toBeInstanceOf(RepositoryError)
+    expect(calls.some((c) => c.target === 'submit_school_file')).toBe(false)
+  })
+
+  it('a registration failure after upload is an error; a retry re-registers the SAME object instead of uploading again', async () => {
+    let fail = true
+    const { repos, calls } = setup((c) => {
+      if (c.target === 'submit_school_file' && fail) return { error: { code: '', message: 'TypeError: Failed to fetch' } }
+      return happy(c)
+    })
+    const file = csv()
+    expect(isRepositoryError(await rejection(repos.fileRepository.submit({ ...SUBMISSION, file }, { onProgress: () => {} })), 'network')).toBe(true)
+    fail = false
+    await repos.fileRepository.submit({ ...SUBMISSION, file }, { onProgress: () => {} })
+    const uploads = calls.filter((c) => c.kind === 'upload')
+    const registrations = calls.filter((c) => c.target === 'submit_school_file').map((c) => (c.args as { p_storage_path: string }).p_storage_path)
+    expect(uploads).toHaveLength(1) // anonymous visitors cannot delete objects, so a retry must not leave a second copy
+    expect(registrations).toEqual([(uploads[0].args as { path: string }).path, (uploads[0].args as { path: string }).path])
+    // No cleanup is attempted from the browser: there is no delete call at all.
+    expect(calls.some((c) => c.ops.some((o) => /remove|delete/i.test(o.op)))).toBe(false)
+  })
+
+  it('maps database refusals: closed school, invalid input, unconfirmed upload', async () => {
+    for (const [error, code] of [
+      [{ code: 'P0001', message: 'school_unavailable' }, 'school_unavailable'],
+      [{ code: '22023', message: 'invalid_input' }, 'invalid_input'],
+      [{ code: '22023', message: 'invalid_file' }, 'invalid_input'],
+      [{ code: 'P0001', message: 'file_not_uploaded' }, 'unknown'],
+      [{ code: '42501', message: 'permission denied for function submit_school_file' }, 'permission_denied'],
+    ] as const) {
+      const { repos } = setup((c) => (c.target === 'submit_school_file' ? { error } : happy(c)))
+      expect(isRepositoryError(await rejection(repos.fileRepository.submit({ ...SUBMISSION, file: csv() }, { onProgress: () => {} })), code), code).toBe(true)
+    }
+  })
+
+  it('the admin list selects explicit columns (never the storage path) and filters by review status', async () => {
+    const { repos, calls } = setup((c) => (c.kind === 'rpc' ? { data: SUMMARY } : { data: [], count: 0 }))
+    const r = await repos.fileRepository.list({ reviewStatus: 'pending', search: 'asha' })
+    const q = calls.find((c) => c.kind === 'from')!
+    expect(q.target).toBe('uploaded_files')
+    expect(opArgs(q, 'select')[0][0]).not.toMatch(/storage_path|storage_bucket|\*/)
+    expect(opArgs(q, 'select')[0][0]).toContain('review_status')
+    expect(opArgs(q, 'eq')).toContainEqual(['review_status', 'pending'])
+    expect(opArgs(q, 'or')[0][0]).toContain('contact_person.ilike')
+    expect(r.counts.byReview).toEqual(SUMMARY.files.byReview)
+    expect(isRepositoryError(await rejection(repos.fileRepository.list({ reviewStatus: 'maybe' as never })), 'invalid_filter')).toBe(true)
+  })
+
+  it('review goes through admin_review_file, and returns the detail with its history', async () => {
+    const row = {
+      id: UUID, reference_no: 'FILE-2026-00009', original_name: 'a.csv', file_type: 'csv', size_bytes: 3, storage_state: 'stored', school_id: UUID2, customer_name: null,
+      uploaded_at: 'then', contact_person: 'Asha', contact_details: '9876543210', category: 'student_data', description: 'd'.repeat(20), instructions: null,
+      review_status: 'approved', review_notes: 'ok', reviewed_at: 'now', school: { name: 'S' },
+    }
+    const { repos, calls } = setup((c) => {
+      if (c.target === 'admin_review_file') return { data: [{ file_id: UUID, review_status: 'approved', reviewed_at: 'now' }] }
+      if (c.target === 'uploaded_files') return { data: row }
+      if (c.target === 'uploaded_file_reviews') return { data: [{ review_status: 'approved', review_notes: 'ok', reviewed_at: 'now' }] }
+      return undefined
+    })
+    const d = await repos.fileRepository.review(UUID, 'approved', '  ok  ')
+    expect(calls[0]).toMatchObject({ kind: 'rpc', target: 'admin_review_file', args: { p_file_id: UUID, p_status: 'approved', p_notes: 'ok' } })
+    expect(d).toMatchObject({ reviewStatus: 'approved', reviewNotes: 'ok', contactDetails: '9876543210', reviewHistory: [{ status: 'approved', notes: 'ok', at: 'now' }] })
+    expect(JSON.stringify(d)).not.toContain('incoming/')
+  })
+
+  it('review refuses bad input before any request, and maps the database answers', async () => {
+    const { repos, calls } = setup()
+    expect(isRepositoryError(await rejection(repos.fileRepository.review(UUID, 'maybe' as never)), 'invalid_status')).toBe(true)
+    expect(isRepositoryError(await rejection(repos.fileRepository.review(UUID, 'approved', 'x'.repeat(1001))), 'invalid_input')).toBe(true)
+    expect(isRepositoryError(await rejection(repos.fileRepository.review('', 'approved')), 'invalid_id')).toBe(true)
+    expect(calls).toHaveLength(0)
+    for (const [error, code] of [
+      [{ code: 'P0001', message: 'no_change' }, 'no_change'],
+      [{ code: 'P0002', message: 'not_found' }, 'not_found'],
+      [{ code: '42501', message: 'not_authorized' }, 'permission_denied'],
+      [{ code: 'PGRST301', message: 'JWT expired' }, 'permission_denied'],
+    ] as const) {
+      const { repos: r2 } = setup(() => ({ error }))
+      expect(isRepositoryError(await rejection(r2.fileRepository.review(UUID, 'approved')), code), code).toBe(true)
+    }
+  })
+
+  it('a download link is short-lived and an attachment, and a metadata-only record has none', async () => {
     const stored = setup((c) => (c.kind === 'signedUrl' ? { data: { signedUrl: 'https://example.invalid/s' } } : { data: { storage_state: 'stored', storage_bucket: 'school-uploads', storage_path: 'incoming/x.csv', original_name: 'a.csv' } }))
     expect(await stored.repos.fileRepository.getDownloadUrl(UUID)).toBe('https://example.invalid/s')
     const signed = stored.calls.find((c) => c.kind === 'signedUrl')!.args as { expiresIn: number; options: { download: string } }
@@ -352,7 +462,7 @@ describe('dashboard', () => {
   it('derives the counts from admin_summary', async () => {
     const { repos, calls } = setup(() => ({ data: SUMMARY }))
     expect(await repos.dashboardRepository.getCounts()).toEqual({
-      totalSchools: 5, activeSchools: 4, totalStudents: 18, pendingStudentReviews: 3, pendingOrders: 3, uploadedFiles: 4, awaitingCompletion: 8, pendingFeedback: 2,
+      totalSchools: 5, activeSchools: 4, totalStudents: 18, pendingStudentReviews: 3, pendingOrders: 3, uploadedFiles: 4, pendingFileReviews: 2, awaitingCompletion: 8, pendingFeedback: 2,
     })
     expect(calls.map((c) => c.target)).toEqual(['admin_summary'])
   })

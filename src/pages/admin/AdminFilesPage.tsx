@@ -15,7 +15,7 @@ import { toFileListParams, useFileFilters } from '@/features/uploads/admin/useFi
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { formatBytes } from '@/lib/format'
 import { dataSource } from '@/services'
-import { isRepositoryError } from '@/services/errors'
+import { describeError, isRepositoryError } from '@/services/errors'
 
 const PAGE_SIZE = 10
 
@@ -37,15 +37,16 @@ export function AdminFilesPage() {
               <strong className="text-ink" data-testid="total-count">{data.total}</strong> {data.total === 1 ? 'file matches' : 'files match'} the current view.{dataSource === 'mock' && ' Demo data keeps only the details of each upload, not the files themselves.'}
             </span>
           ) : (
-            'Review the spreadsheets that have been uploaded.'
+            'Review the school data files that have been submitted.'
           )
         }
       />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <StatCard loading={isPending} label="Total files" value={stats?.total} icon="files" tone="blue" hint={stats ? `${formatBytes(stats.totalBytes)} in total` : undefined} />
-        <StatCard loading={isPending} label="Excel files" value={stats?.excel} icon="upload" tone="green" hint=".xlsx and .xls" />
-        <StatCard loading={isPending} label="CSV files" value={stats?.csv} icon="receipt" tone="gold" hint=".csv" />
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard loading={isPending} label="Total files" value={stats?.total} icon="files" tone="blue" hint={stats ? `${formatBytes(stats.totalBytes)} · ${stats.excel} Excel, ${stats.csv} CSV` : undefined} />
+        <StatCard loading={isPending} label="Waiting for review" value={stats?.pending} icon="timer" tone="orange" to="/admin/files?review=pending" />
+        <StatCard loading={isPending} label="Corrections requested" value={stats?.corrections} icon="file-pen" tone="gold" to="/admin/files?review=corrections_required" />
+        <StatCard loading={isPending} label="Approved" value={stats?.approved} icon="shield-check" tone="green" hint={stats ? `${stats.rejected} rejected` : undefined} />
       </div>
 
       <AdminCard>
@@ -65,7 +66,7 @@ export function AdminFilesPage() {
           </div>
         ) : isError ? (
           <div className="p-6">
-            <ErrorState message="Could not load files." onRetry={() => void refetch()} />
+            <ErrorState message={describeError(error, 'Could not load files.')} onRetry={() => void refetch()} />
           </div>
         ) : isPending ? (
           <div className="space-y-3 p-4" aria-busy="true" aria-label="Loading files">
@@ -86,7 +87,7 @@ export function AdminFilesPage() {
                 }
               />
             ) : (
-              <EmptyState title="No files yet" text="Files appear here after they are uploaded on the public File Upload page." />
+              <EmptyState title="No files yet" text="Files appear here after they are submitted on the public Submit School Data File page." />
             )}
           </div>
         ) : (

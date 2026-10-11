@@ -6,8 +6,8 @@ import type { UploadedFileType } from '@/types'
 
 interface Props {
   file: File
-  /** ready: shows Remove / Replace / Upload. Other modes show the file only (actions live elsewhere). */
-  mode: 'ready' | 'busy'
+  /** ready: Remove / Replace / Upload. form: Remove / Replace (the surrounding form submits). busy: the file only. */
+  mode: 'ready' | 'form' | 'busy'
   onRemove?: () => void
   onReplace?: () => void
   onUpload?: () => void
@@ -40,6 +40,16 @@ export function SelectedFileCard({ file, mode, onRemove, onReplace, onUpload }: 
             <ImagePlus aria-hidden /> Replace
           </Button>
           <Button type="button" variant="ghost" size="lg" className="text-destructive hover:bg-red-50 hover:text-destructive" onClick={onRemove}>
+            <Trash2 aria-hidden /> Remove
+          </Button>
+        </div>
+      )}
+      {mode === 'form' && (
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <Button type="button" variant="outline" size="lg" onClick={onReplace} aria-label={`Replace ${file.name}`}>
+            <ImagePlus aria-hidden /> Replace file
+          </Button>
+          <Button type="button" variant="ghost" size="lg" className="text-destructive hover:bg-red-50 hover:text-destructive" onClick={onRemove} aria-label={`Remove ${file.name}`}>
             <Trash2 aria-hidden /> Remove
           </Button>
         </div>

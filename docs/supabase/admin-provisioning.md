@@ -23,18 +23,18 @@ promoted with one owner-only SQL call. Nothing in the app, a migration, the seed
 
 ## Expected migration history
 
-Provisioning needs the **13** migrations in `supabase/migrations/`, applied by a separately approved step. The applied set must be exactly:
+Provisioning needs the **14** migrations in `supabase/migrations/`, applied by a separately approved step. The applied set must be exactly:
 
 ```
 20261011150001  20261011150002  20261011150003  20261011150004  20261011150005  20261011150006
 20261011150007  20261011150008  20261011150009  20261011150010  20261011150011  20261011160001
-20261012090001
+20261012090001  20261013090001
 ```
 
 Verify (read-only), either of:
 
-- SQL editor: `select version from supabase_migrations.schema_migrations order by version;` (exactly the 13 rows above; none missing, none extra). `01_preflight_read_only.sql` runs this comparison for you (rows 1 and 2).
-- CLI: `npx supabase migration list --linked` (read-only against the linked project): both columns show all 13.
+- SQL editor: `select version from supabase_migrations.schema_migrations order by version;` (exactly the 14 rows above; none missing, none extra). `01_preflight_read_only.sql` runs this comparison for you (rows 1 and 2).
+- CLI: `npx supabase migration list --linked` (read-only against the linked project): both columns show all 14.
 
 Only the set of versions and their order can be compared; the history table does not record apply order beyond the version. If the history table does not exist, `01` reports INCONCLUSIVE: check Dashboard, Database, Migrations by hand.
 
@@ -48,7 +48,7 @@ Returns one row per check with `PASS`, `FAIL` or `INCONCLUSIVE`, ending with **O
 
 | Rows | Checks (all read from the catalog) |
 | --- | --- |
-| 1-2 | Migration history table present; applied versions exactly the 13 expected (names missing and unexpected versions). |
+| 1-2 | Migration history table present; applied versions exactly the 14 expected (names missing and unexpected versions). |
 | 3 | `private.provision_administrator(uuid)` exists with that exact signature, SECURITY DEFINER, empty `search_path`, returns void. |
 | 4-5 | Unique index `profiles_single_admin` (unique, valid, one column `role`, partial on admin); trigger `profiles_guard_write` (before insert/update, per row, enabled). |
 | 6-7 | RLS enabled on `public.profiles`; its only policy is `profiles_select_own` (SELECT, `authenticated`). |
@@ -91,7 +91,7 @@ Fill in the UID and email (first CTE) and run after step 2. One row per check, e
 
 ## Prerequisites
 
-1. The 13 migrations applied (above) by a separately approved step.
+1. The 14 migrations applied (above) by a separately approved step.
 2. `supabase/verification/verify-public-api.mjs` and the privilege queries in `docs/supabase/testing.md` run against the hosted project with no anonymous access found. **Do not create the administrator before that.** (That script tests the *anonymous* surface only. It says nothing about whether Dashboard user creation works.)
 
 ## Steps (you perform these; nothing here touches the hosted project)

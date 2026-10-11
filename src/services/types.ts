@@ -1,5 +1,5 @@
 import type { AdVisibility } from '@/lib/advertisements'
-import type { Advertisement, ServiceCategory, ServiceInput, AdvertisementInput, FeedbackStatus, OrderInput, OrderStatus, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, UploadedFile, UploadedFileType, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
+import type { FileReviewEvent, FileReviewStatus, SchoolFileSubmission, Advertisement, ServiceCategory, ServiceInput, AdvertisementInput, FeedbackStatus, OrderInput, OrderStatus, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, UploadedFile, UploadedFileType, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
 
 /**
  * Repository contracts. The UI depends only on these interfaces. Two implementations exist: `services/supabase/*`
@@ -257,12 +257,21 @@ export interface FileUploadOptions {
 }
 
 export interface FileRepository {
-  /** Uploads a validated file. Rejects on failure. Real implementation: Supabase Storage + metadata row. */
-  upload(file: File, options: FileUploadOptions): Promise<FileUploadResult>
+  /**
+   * Public "Submit School Data File". Validates every field and the file, stores the file privately, then registers the
+   * submission as PENDING review. Resolves only when both steps succeeded. Rejects 'invalid_input' (with `fieldErrors`),
+   * 'school_unavailable', or a transport error; nothing is reported as submitted on failure.
+   */
+  submit(input: SchoolFileSubmission, options: FileUploadOptions): Promise<FileUploadResult>
   /** Admin list of stored file records, newest upload first. Rejects RepositoryError('invalid_filter') for a malformed filter. */
   list(params?: FileListParams): Promise<FileListResult>
-  /** Rejects with RepositoryError('invalid_id' | 'not_found'). Metadata only: never storage paths or file bytes. */
-  getDetail(id: ID): Promise<AdminFile>
+  /** Rejects with RepositoryError('invalid_id' | 'not_found'). Metadata and review history only: never storage paths or file bytes. */
+  getDetail(id: ID): Promise<AdminFileDetail>
+  /**
+   * Administrator review: sets the decision and REPLACES the notes (empty clears them). Rejects 'invalid_id' | 'not_found'
+   * | 'invalid_status' | 'invalid_input' (notes too long) | 'no_change'. Enforced again by the database.
+   */
+  review(id: ID, status: FileReviewStatus, notes?: string): Promise<AdminFileDetail>
   /**
    * A short-lived link (about a minute) to download a stored file. Administrator only. The link is used straight away
    * and never stored, logged or put in the page URL. Rejects 'invalid_id' | 'not_found' | 'not_stored'.
@@ -275,8 +284,13 @@ export interface FileRepository {
  * `storageState` says whether there are bytes to download ('stored') or only this record ('metadata_only').
  */
 export type AdminFile = Omit<UploadedFile, 'storagePath' | 'customer'> & {
-  /** Display name of the associated school. Undefined when the upload carried no school (the public upload page does not collect one). */
+  /** Display name of the associated school. Undefined for older uploads that carried no school. */
   schoolName?: string
+}
+
+export type AdminFileDetail = AdminFile & {
+  /** Review decisions, oldest first. */
+  reviewHistory: FileReviewEvent[]
 }
 
 export interface FileListParams {
@@ -285,6 +299,7 @@ export interface FileListParams {
   /** A school id, 'none' for files with no school, or empty/undefined for all. */
   schoolId?: string
   type?: 'all' | UploadedFileType
+  reviewStatus?: 'all' | FileReviewStatus
   /** Inclusive local-date range (YYYY-MM-DD) on the upload date. */
   from?: string
   to?: string
@@ -295,7 +310,7 @@ export interface FileListParams {
 export interface FileListResult extends PagedResult<AdminFile> {
   totalPages: number
   /** Overall totals, independent of the filters. */
-  counts: { total: number; totalBytes: number; byType: Record<UploadedFileType, number> }
+  counts: { total: number; totalBytes: number; byType: Record<UploadedFileType, number>; byReview: Record<FileReviewStatus, number> }
 }
 
 export interface SchoolListParams {
@@ -344,6 +359,8 @@ export interface DashboardCounts {
   /** Orders not yet started: Order Received or Data Verification. */
   pendingOrders: number
   uploadedFiles: number
+  /** Submitted files waiting for the administrator's review. */
+  pendingFileReviews: number
   /** Every order that is not yet Delivered. */
   awaitingCompletion: number
   /** Feedback waiting for moderation. */

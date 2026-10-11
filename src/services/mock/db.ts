@@ -5,7 +5,7 @@ import { ORDERS_DATA } from '@/data/orders'
 import { SCHOOLS_DATA } from '@/data/schools'
 import { SERVICES_DATA } from '@/data/services'
 import { STUDENTS_DATA } from '@/data/students'
-import type { Advertisement, Feedback, Order, School, Service, Student, UploadedFile } from '@/types'
+import type { Advertisement, Feedback, FileReviewEvent, ID, Order, School, Service, Student, UploadedFile } from '@/types'
 
 /**
  * The prototype's in-memory "database", shared by every mock repository so that, for example,
@@ -22,6 +22,8 @@ export const db = {
   files: FILES_DATA.map((f): UploadedFile => ({ ...f })),
   advertisements: ADVERTISEMENTS_DATA.map((a): Advertisement => ({ ...a })),
   feedback: FEEDBACK_DATA.map((f): Feedback => ({ ...f })),
+  /** File review decisions (the history shown to the administrator); starts empty. */
+  fileReviews: [] as (FileReviewEvent & { fileId: ID })[],
 }
 
 export const pad5 = (n: number) => String(n).padStart(5, '0')

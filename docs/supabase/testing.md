@@ -1,6 +1,7 @@
 # Database security tests
 
-Eight pgTAP-style test files in `supabase/tests/database/` with 315 assertions in total (28 + 28 + 37 + 51 + 52 + 36 + 42 + 41).
+Nine pgTAP-style test files in `supabase/tests/database/` with 363 assertions in total (28 + 28 + 37 + 51 + 52 + 36 + 42 + 42 + 47).
+`08_school_file_submissions.test.sql` covers migration 14 (public submission limits, privacy of contact details and notes, the review function, history, summary counts, records made before the migration).
 `07_phase3_uploads_and_summary.test.sql` covers migration 13 (insert-only uploads, photo/file registration, `admin_summary`).
 Each file runs inside `begin; … rollback;`, creates only fictional fixtures and leaves nothing behind.
 
@@ -42,7 +43,7 @@ all seven test files were executed in an in-memory PostgreSQL emulator (PGlite) 
   and `storage.buckets`/`storage.objects` with RLS on;
 - supplies a tiny pgTAP-compatible set of functions (`plan`, `ok`, `is`, `isnt`, `throws_ok`, `lives_ok`, `is_empty`, `finish`).
 
-Results of the latest run (Phase 3): all 13 migrations apply in order, `seed.sql` loads, **315 assertions pass, 0 fail**.
+Results of the latest run (Phase 3): all 14 migrations apply in order, `seed.sql` loads, **363 assertions pass, 0 fail**.
 **Mutation check:** seven deliberate weakenings (anon `SELECT` on students, RLS disabled on orders, anon execute on an admin
 function, tracking that ignores the code, public bucket, an anon storage policy, update grant on the approval column) were
 each caught by at least one test.

@@ -11,18 +11,18 @@ import { ACCEPTED_EXTENSIONS, MAX_UPLOAD_MB } from '@/validations/upload'
 const INFO = [
   { icon: FileSpreadsheet, title: 'Accepted formats', text: ACCEPTED_EXTENSIONS.map((e) => `.${e.toUpperCase()}`).join(', ') },
   { icon: HardDrive, title: 'Maximum size', text: `${MAX_UPLOAD_MB} MB per file` },
-  { icon: Files, title: 'One file at a time', text: 'Upload again for each additional file' },
+  { icon: Files, title: 'One file per submission', text: 'Submit again for each additional file' },
 ]
 
 export function FileUploadPage() {
-  usePageTitle('Upload Student Data')
+  usePageTitle('Submit School Data File')
   return (
     <>
       <PageHero
         breadcrumb="File Upload"
         eyebrow="File Upload"
-        title="Upload Student Data"
-        description="Upload your student list in Excel or CSV format for processing."
+        title="Submit School Data File"
+        description="Send your student list or other school data in Excel or CSV format. Our team reviews every file before work begins."
       />
 
       <div className="container-page py-8 sm:py-12">

@@ -43,12 +43,12 @@ describe('the browser calls only real database functions, with their real parame
     })),
   )
 
-  it('finds the calls', () => {
+  it('finds the calls (the withdrawn submit_file_upload is no longer called)', () => {
     expect(new Set(calls.map((c) => c.name))).toEqual(
       new Set([
         'admin_summary', 'list_active_schools', 'resolve_school', 'submit_student', 'admin_review_student', 'track_order', 'admin_create_order',
         'admin_rotate_tracking_code', 'admin_set_order_status', 'list_enabled_services', 'list_published_advertisements', 'list_approved_feedback',
-        'submit_feedback', 'submit_file_upload',
+        'submit_feedback', 'submit_school_file', 'admin_review_file',
       ]),
     )
   })
@@ -74,7 +74,7 @@ describe('database access stays in the data layer and names its columns', () => 
   })
 
   it('reads only the application tables, and never profiles from the data layer', () => {
-    const allowed = new Set(['schools', 'students', 'orders', 'order_status_history', 'uploaded_files', 'services', 'advertisements', 'feedback'])
+    const allowed = new Set(['schools', 'students', 'orders', 'order_status_history', 'uploaded_files', 'uploaded_file_reviews', 'services', 'advertisements', 'feedback'])
     for (const f of appFiles.filter((x) => rel(x).startsWith('src/services/supabase/'))) {
       for (const m of code(f).matchAll(/\.from\(\s*'(\w[\w-]*)'\s*\)/g)) {
         // storage.from('<bucket>') uses the same method name

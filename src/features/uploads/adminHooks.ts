@@ -1,7 +1,7 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fileRepository } from '@/services'
 import type { FileListParams } from '@/services/types'
-import type { ID } from '@/types'
+import type { FileReviewStatus, ID } from '@/types'
 
 export const fileKeys = {
   all: ['files'] as const,
@@ -18,3 +18,12 @@ export const useAdminFile = (id: ID | null) =>
 
 /** A fresh signed link per click. A mutation, so the link is never kept in the query cache. */
 export const useFileDownload = () => useMutation({ mutationFn: (id: ID) => fileRepository.getDownloadUrl(id), gcTime: 0 })
+
+/** Approve / reject / request corrections / back to pending, with notes. Refreshes the file list, the detail and the dashboard. */
+export function useReviewFile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { id: ID; status: FileReviewStatus; notes: string }) => fileRepository.review(v.id, v.status, v.notes),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: fileKeys.all }), qc.invalidateQueries({ queryKey: ['dashboard'] })]),
+  })
+}

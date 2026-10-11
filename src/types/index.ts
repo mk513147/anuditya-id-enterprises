@@ -157,12 +157,63 @@ export interface UploadedFile {
   customer?: string
   /** 'stored' = the file's bytes are in private storage and can be downloaded; 'metadata_only' = only this record exists. */
   storageState: FileStorageState
+  /**
+   * Submission details from the public "Submit School Data File" form. Absent on records made before that form existed.
+   * Contact details are for the administrator only: they never appear in any public response.
+   */
+  contactPerson?: string
+  contactDetails?: string
+  category?: FileCategory
+  description?: string
+  instructions?: string
+  /** Every submission starts 'pending'; only the administrator changes it. */
+  reviewStatus: FileReviewStatus
+  /** The administrator's notes (internal). */
+  reviewNotes?: string
+  reviewedAt?: ISODate
+}
+
+export const FILE_CATEGORIES = ['student_data', 'design_materials', 'data_corrections', 'other'] as const
+export type FileCategory = (typeof FILE_CATEGORIES)[number]
+export const FILE_CATEGORY_LABEL: Record<FileCategory, string> = {
+  student_data: 'Student data / student list',
+  design_materials: 'Design or printing materials',
+  data_corrections: 'Corrections to previously submitted data',
+  other: 'Other',
+}
+
+export const FILE_REVIEW_STATUSES = ['pending', 'approved', 'rejected', 'corrections_required'] as const
+export type FileReviewStatus = (typeof FILE_REVIEW_STATUSES)[number]
+export const FILE_REVIEW_LABEL: Record<FileReviewStatus, string> = {
+  pending: 'Pending review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  corrections_required: 'Corrections required',
+}
+
+/** One recorded review decision (administrator only). */
+export interface FileReviewEvent {
+  status: FileReviewStatus
+  notes?: string
+  at: ISODate
+}
+
+/** What the public form submits. The file is validated in the browser and again by storage and the database. */
+export interface SchoolFileSubmission {
+  schoolId: ID
+  contactPerson: string
+  /** An email address or a 10-digit mobile number. */
+  contactDetails: string
+  category: FileCategory
+  description: string
+  instructions?: string
+  file: File
 }
 
 export type FileStorageState = 'stored' | 'metadata_only'
 
 /** What the public UI receives after an upload: no internal storage details. */
-export type FileUploadResult = Pick<UploadedFile, 'referenceNo' | 'originalName' | 'type' | 'sizeBytes' | 'uploadedAt'>
+export type FileUploadResult = Pick<UploadedFile, 'referenceNo' | 'originalName' | 'type' | 'sizeBytes' | 'uploadedAt'> & { schoolName?: string }
 
 export type ServiceCategory = 'id-cards' | 'school-materials' | 'design-printing'
 

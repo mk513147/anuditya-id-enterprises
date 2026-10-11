@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { formatDate } from '@/lib/format'
-import type { School } from '@/types'
+import { FILE_REVIEW_LABEL, FILE_REVIEW_STATUSES, type School } from '@/types'
 import { ACCEPTED_EXTENSIONS } from '@/validations/upload'
 import type { FileFilters as Filters } from './useFileFilters'
 
@@ -39,6 +39,7 @@ export function FileFilters({ filters, update, clear, schools, hasActiveFilters 
   const chips = [
     filters.q && { key: 'q', text: `Search: “${filters.q}”`, remove: () => { setText(''); update({ q: '' }) } },
     filters.school && { key: 'school', text: `School: ${schoolName(filters.school)}`, remove: () => update({ school: '' }) },
+    filters.review !== 'all' && { key: 'review', text: `Review: ${FILE_REVIEW_LABEL[filters.review]}`, remove: () => update({ review: 'all' }) },
     filters.type !== 'all' && { key: 'type', text: `Type: .${filters.type}`, remove: () => update({ type: 'all' }) },
     filters.from && { key: 'from', text: `From: ${formatDate(filters.from)}`, remove: () => update({ from: '' }) },
     filters.to && { key: 'to', text: `To: ${formatDate(filters.to)}`, remove: () => update({ to: '' }) },
@@ -46,12 +47,12 @@ export function FileFilters({ filters, update, clear, schools, hasActiveFilters 
 
   return (
     <div className="border-b p-4 sm:p-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="sm:col-span-2 lg:col-span-1">
-          <Label htmlFor="file-search" className={label}>Search by file name</Label>
+          <Label htmlFor="file-search" className={label}>Search</Label>
           <div className="relative">
             <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input id="file-search" type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="File name or reference" autoComplete="off" className="h-11 pl-9 text-base" />
+            <Input id="file-search" type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder="File, reference or contact person" autoComplete="off" className="h-11 pl-9 text-base" />
           </div>
         </div>
         <div>
@@ -61,6 +62,15 @@ export function FileFilters({ filters, update, clear, schools, hasActiveFilters 
             <option value="none">No school recorded</option>
             {schools.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div>
+          <Label htmlFor="file-review" className={label}>Review status</Label>
+          <NativeSelect id="file-review" value={filters.review} onChange={(e) => update({ review: e.target.value as Filters['review'] })}>
+            <option value="all">Any status</option>
+            {FILE_REVIEW_STATUSES.map((s) => (
+              <option key={s} value={s}>{FILE_REVIEW_LABEL[s]}</option>
             ))}
           </NativeSelect>
         </div>

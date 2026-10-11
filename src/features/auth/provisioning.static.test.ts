@@ -21,7 +21,7 @@ const migrationVersions = fs.readdirSync(path.join(ROOT, 'supabase/migrations'))
 describe('provisioning scripts', () => {
   it('01 lists exactly the migration versions that exist in supabase/migrations, in order', () => {
     const listed = [...SQL01.matchAll(/'(\d{14})'/g)].map((m) => m[1])
-    expect(migrationVersions).toHaveLength(13)
+    expect(migrationVersions).toHaveLength(14)
     expect(listed).toEqual(migrationVersions)
   })
 

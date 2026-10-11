@@ -65,3 +65,25 @@ export function validateUploadFile(file: File | null | undefined): string | null
   if (file.size > MAX_UPLOAD_BYTES) return `File is too large. Maximum size is ${MAX_UPLOAD_MB} MB.`
   return null
 }
+
+const startsWith = (bytes: Uint8Array, sig: number[]) => sig.every((b, i) => bytes[i] === b)
+
+/**
+ * A light content check in the browser: the first bytes must match the format the extension claims (.xlsx is a ZIP
+ * package, .xls an OLE2 compound file, .csv plain text with no NUL bytes). It catches renamed files and obvious mistakes.
+ * It does NOT prove the file is safe: spreadsheets stay untrusted, and nothing here opens or evaluates their contents.
+ * Returns an error message, or null.
+ */
+export async function sniffSpreadsheet(file: File): Promise<string | null> {
+  const ext = getExtension(file.name)
+  let head: Uint8Array
+  try {
+    head = new Uint8Array(await file.slice(0, 4096).arrayBuffer())
+  } catch {
+    return 'This file could not be read. Please choose it again.'
+  }
+  if (ext === 'xlsx' && !startsWith(head, [0x50, 0x4b, 0x03, 0x04])) return 'This file is not a real .xlsx workbook. Please save it from Excel as .xlsx or .csv and try again.'
+  if (ext === 'xls' && !startsWith(head, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) return 'This file is not a real .xls workbook. Please save it from Excel as .xlsx or .csv and try again.'
+  if (ext === 'csv' && head.includes(0)) return 'This .csv file contains binary data. Please export it again as a plain CSV file.'
+  return null
+}

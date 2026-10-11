@@ -1,4 +1,4 @@
-import type { Advertisement, Feedback, FileStorageState, Order, OrderStatus, School, Service, ServiceCategory, Student, StudentApprovalStatus, UploadedFileType } from '@/types'
+import type { Advertisement, Feedback, FileCategory, FileReviewStatus, FileStorageState, Order, OrderStatus, School, Service, ServiceCategory, Student, StudentApprovalStatus, UploadedFileType } from '@/types'
 import { opt } from './shared'
 
 /**
@@ -134,8 +134,10 @@ export const toOrder = (r: OrderRow): Order => ({
 export const toAdminOrder = (r: OrderRow) => ({ ...toOrder(r), schoolName: r.school?.name ?? r.customer_name, schoolCode: opt(r.school?.code) })
 
 // ------------------------------------------------------------------ uploaded files
-/** No storage bucket/path: those are read only when creating a download link. */
-export const FILE_COLUMNS = 'id, reference_no, original_name, file_type, size_bytes, storage_state, school_id, customer_name, uploaded_at, school:schools(name)'
+/** No storage bucket/path: those are read only when creating a download link. Administrator only (RLS). */
+export const FILE_COLUMNS =
+  'id, reference_no, original_name, file_type, size_bytes, storage_state, school_id, customer_name, uploaded_at, ' +
+  'contact_person, contact_details, category, description, instructions, review_status, review_notes, reviewed_at, school:schools(name)'
 export interface FileRow {
   id: string
   reference_no: string
@@ -146,6 +148,14 @@ export interface FileRow {
   school_id: string | null
   customer_name: string | null
   uploaded_at: string
+  contact_person: string | null
+  contact_details: string | null
+  category: FileCategory | null
+  description: string | null
+  instructions: string | null
+  review_status: FileReviewStatus
+  review_notes: string | null
+  reviewed_at: string | null
   school?: { name: string } | null
 }
 export const toAdminFile = (r: FileRow) => ({
@@ -158,6 +168,14 @@ export const toAdminFile = (r: FileRow) => ({
   schoolId: opt(r.school_id),
   storageState: r.storage_state,
   schoolName: r.school?.name ?? opt(r.customer_name),
+  contactPerson: opt(r.contact_person),
+  contactDetails: opt(r.contact_details),
+  category: opt(r.category),
+  description: opt(r.description),
+  instructions: opt(r.instructions),
+  reviewStatus: r.review_status,
+  reviewNotes: opt(r.review_notes),
+  reviewedAt: opt(r.reviewed_at),
 })
 
 // ------------------------------------------------------------------ services

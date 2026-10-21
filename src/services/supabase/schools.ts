@@ -1,6 +1,8 @@
 import { nextFreeSlug } from '@/lib/slug'
-import type { SchoolImage, SchoolInput } from '@/types'
-import { inspectImage } from '@/validations/schoolImage'
+import type { SchoolImage, SchoolImageStatus, SchoolInput } from '@/types'
+import { normalizeContact } from '@/validations/fileSubmission'
+import { inspectImage, schoolImageSubmissionSchema, type ImageCheck } from '@/validations/schoolImage'
+import { parseInput } from '../validate'
 import { RepositoryError } from '../errors'
 import type { SchoolRepository } from '../types'
 import { SCHOOL_COLUMNS, toSchool, type SchoolRow } from './rows'
@@ -33,7 +35,9 @@ const IMAGE_BUCKET = 'school-images'
 /** Preview links for the school-image grid: long enough to look at the page, short enough not to be worth keeping. */
 export const IMAGE_URL_SECONDS = 300
 /** storage_path is read only to create preview links; it is never returned to the UI. */
-const IMAGE_COLUMNS = 'id, school_id, storage_path, original_name, mime_type, size_bytes, alt_text, is_primary, display_order, created_at'
+const IMAGE_COLUMNS =
+  'id, school_id, storage_path, original_name, mime_type, size_bytes, alt_text, is_primary, display_order, created_at, ' +
+  'review_status, source, submitted_contact_person, submitted_contact_details, submission_note, reviewed_at'
 interface ImageRow {
   id: string
   school_id: string
@@ -45,6 +49,12 @@ interface ImageRow {
   is_primary: boolean
   display_order: number
   created_at: string
+  review_status: SchoolImageStatus
+  source: 'admin' | 'public'
+  submitted_contact_person: string | null
+  submitted_contact_details: string | null
+  submission_note: string | null
+  reviewed_at: string | null
 }
 const toImage = (r: ImageRow, url: string): SchoolImage => ({
   id: r.id,
@@ -57,7 +67,54 @@ const toImage = (r: ImageRow, url: string): SchoolImage => ({
   displayOrder: r.display_order,
   createdAt: r.created_at,
   url,
+  reviewStatus: r.review_status,
+  source: r.source,
+  submission: r.submitted_contact_person && r.submitted_contact_details
+    ? { contactPerson: r.submitted_contact_person, contactDetails: r.submitted_contact_details, note: r.submission_note ?? undefined }
+    : undefined,
+  reviewedAt: r.reviewed_at ?? undefined,
 })
+
+const IMAGE_ERRORS = {
+  byMessage: { duplicate_image: 'duplicate_image', invalid_image: 'invalid_input', image_not_uploaded: 'unknown', not_approved: 'invalid_status', primary_image: 'invalid_status' },
+  unique: 'duplicate_image',
+} as const
+
+/** Storage reports an object that already exists (a non-overwriting upload to a taken name). */
+const alreadyExists = (e: unknown) => {
+  const x = (e ?? {}) as { statusCode?: string | number; message?: string; error?: string }
+  return String(x.statusCode) === '409' || /already exists|duplicate/i.test(`${x.message ?? ''} ${x.error ?? ''}`)
+}
+
+/**
+ * The ONE image-storing routine, shared by the administrator uploader and the public form: the file has already passed
+ * inspectImage (type, size, signature, decode, checksum); it is uploaded without overwriting, then registered.
+ *   - Administrator path: a random name; if registration fails the uploaded object is removed again (the orphan-only
+ *     delete policy allows exactly that).
+ *   - Public path: a content-named object (checksum), so a retry finds "already exists", which is our own object, and
+ *     simply registers it again. Nothing is deleted: anonymous visitors have no delete permission.
+ */
+async function storeImage(
+  c: Client,
+  file: File,
+  check: Extract<ImageCheck, { ok: true }>,
+  { path, register, contentNamed }: { path: string; register: () => Promise<{ data: unknown; error: unknown }>; contentNamed: boolean },
+): Promise<unknown> {
+  const up = await guarded(() => c.storage.from(IMAGE_BUCKET).upload(path, file, { contentType: check.type.mime, upsert: false, cacheControl: '3600' }))
+  if (up.error && !(contentNamed && alreadyExists(up.error))) throw toRepositoryError(up.error)
+  const reg = await guarded(register)
+  if (reg.error) {
+    if (!contentNamed) await guarded(() => c.storage.from(IMAGE_BUCKET).remove([path])).catch(() => undefined)
+    throw toRepositoryError(reg.error, IMAGE_ERRORS)
+  }
+  return reg.data
+}
+
+async function checkedImage(file: File) {
+  const check = await inspectImage(file)
+  if (!check.ok) throw new RepositoryError('invalid_input', check.message, undefined, { file: check.message })
+  return check
+}
 
 export function createSupabaseSchoolRepository(client: Client | null): SchoolRepository {
   return {
@@ -144,24 +201,16 @@ export function createSupabaseSchoolRepository(client: Client | null): SchoolRep
     async uploadImage(schoolId, file, { altText } = {}) {
       const c = requireClient(client)
       const id = requireId(schoolId, 'school')
-      // 1. Type, size, real format (file signature), decodability and checksum, before anything is sent.
-      const check = await inspectImage(file)
-      if (!check.ok) throw new RepositoryError('invalid_input', check.message, undefined, { file: check.message })
-      // 2. A random object name inside the school's folder; upsert is off, so nothing is ever overwritten.
+      const check = await checkedImage(file)
+      // A random object name inside the school's folder. The database re-checks the administrator, the school, the stored
+      // type and size, and the shared duplicate rule (one record per school and checksum, whoever added it).
       const path = `schools/${id}/${crypto.randomUUID()}.${check.type.ext}`
-      const up = await guarded(() => c.storage.from(IMAGE_BUCKET).upload(path, file, { contentType: check.type.mime, upsert: false, cacheControl: '3600' }))
-      if (up.error) throw toRepositoryError(up.error)
-      // 3. Register. The database re-checks the administrator, the school, the stored type and size, and duplicates.
-      const reg = await guarded(() =>
-        Promise.resolve(c.rpc('admin_register_school_image', { p_school_id: id, p_storage_path: path, p_original_name: file.name, p_sha256: check.sha256, p_alt_text: altText?.trim() || null })),
-      )
-      if (reg.error) {
-        // Storage and the database are not one transaction: remove the object that no record will use. The bucket allows
-        // the administrator to delete only unregistered objects, so this can never remove a registered image.
-        await guarded(() => c.storage.from(IMAGE_BUCKET).remove([path])).catch(() => undefined)
-        throw toRepositoryError(reg.error, { byMessage: { duplicate_image: 'duplicate_image', invalid_image: 'invalid_input', image_not_uploaded: 'unknown' }, unique: 'duplicate_image' })
-      }
-      const r = (reg.data as { image_id: string }[] | null)?.[0]
+      const data = await storeImage(c, file, check, {
+        path,
+        contentNamed: false,
+        register: () => Promise.resolve(c.rpc('admin_register_school_image', { p_school_id: id, p_storage_path: path, p_original_name: file.name, p_sha256: check.sha256, p_alt_text: altText?.trim() || null })),
+      })
+      const r = (data as { image_id: string }[] | null)?.[0]
       if (!r) throw new RepositoryError('unknown', 'The image could not be confirmed. Please refresh the list.')
       const row = unwrap(await guarded(() => Promise.resolve(c.from('school_images').select(IMAGE_COLUMNS).eq('id', r.image_id).maybeSingle()))) as ImageRow | null
       if (!row) throw new RepositoryError('unknown', 'The image could not be confirmed. Please refresh the list.')
@@ -169,9 +218,61 @@ export function createSupabaseSchoolRepository(client: Client | null): SchoolRep
       return toImage(row, signed.data?.signedUrl ?? '')
     },
 
+    async submitImage(input, file) {
+      const c = requireClient(client)
+      const v = parseInput(schoolImageSubmissionSchema, { ...input, note: input.note ?? '' }, 'Please check the form.')
+      const schoolId = v.schoolId
+      const check = await checkedImage(file)
+      const schools = unwrap(await guarded(() => Promise.resolve(c.rpc('list_active_schools')))) as { id: string }[]
+      if (!schools.some((s) => s.id === schoolId)) throw new RepositoryError('school_unavailable', 'This school is not accepting submissions.')
+      // Skip the upload entirely when the school already has this exact image (no object, no record).
+      const present = unwrap(await guarded(() => Promise.resolve(c.rpc('school_image_already_present', { p_school_id: schoolId, p_sha256: check.sha256 })))) as boolean
+      if (present) return 'already_present'
+      const path = `submissions/${schoolId}/${check.sha256}.${check.type.ext}`
+      const data = await storeImage(c, file, check, {
+        path,
+        contentNamed: true,
+        register: () =>
+          Promise.resolve(
+            c.rpc('submit_school_image', {
+              p_school_id: schoolId,
+              p_contact_person: v.contactPerson,
+              p_contact_details: normalizeContact(v.contactDetails),
+              p_storage_path: path,
+              p_original_name: file.name,
+              p_sha256: check.sha256,
+              p_note: v.note || null,
+            }),
+          ),
+      })
+      const status = (data as { status: string }[] | null)?.[0]?.status
+      if (status !== 'submitted' && status !== 'already_present') throw new RepositoryError('unknown', 'The image could not be confirmed. Please try again.')
+      return status
+    },
+
     async setPrimaryImage(imageId) {
       const c = requireClient(client)
-      unwrap(await guarded(() => Promise.resolve(c.rpc('admin_set_primary_school_image', { p_image_id: requireId(imageId, 'image') }))))
+      unwrap(await guarded(() => Promise.resolve(c.rpc('admin_set_primary_school_image', { p_image_id: requireId(imageId, 'image') }))), IMAGE_ERRORS)
+    },
+
+    async reviewImage(imageId, decision) {
+      const c = requireClient(client)
+      if (!['pending', 'approved', 'rejected'].includes(decision)) throw new RepositoryError('invalid_status', 'That is not a supported decision.')
+      unwrap(await guarded(() => Promise.resolve(c.rpc('admin_review_school_image', { p_image_id: requireId(imageId, 'image'), p_decision: decision }))), IMAGE_ERRORS)
+    },
+
+    async pendingImageCounts() {
+      const c = requireClient(client)
+      const rows = unwrap(
+        await guarded(() => Promise.resolve(c.from('school_images').select('school_id, school:schools(name)').eq('review_status', 'pending').limit(2000))),
+      ) as { school_id: string; school: { name: string } | null }[]
+      const by = new Map<string, { schoolId: string; schoolName: string; count: number }>()
+      for (const r of rows) {
+        const e = by.get(r.school_id) ?? { schoolId: r.school_id, schoolName: r.school?.name ?? 'Unknown school', count: 0 }
+        e.count++
+        by.set(r.school_id, e)
+      }
+      return [...by.values()].sort((a, b) => b.count - a.count || a.schoolName.localeCompare(b.schoolName))
     },
 
     async setActive(id, isActive) {

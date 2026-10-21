@@ -1,6 +1,7 @@
 # Database security tests
 
-Ten pgTAP-style test files in `supabase/tests/database/` with 406 assertions in total (28 + 28 + 37 + 51 + 52 + 38 + 42 + 42 + 47 + 41).
+Eleven pgTAP-style test files in `supabase/tests/database/` with 452 assertions in total (28 + 28 + 37 + 51 + 52 + 38 + 42 + 42 + 47 + 41 + 46).
+`10_public_school_image_submissions.test.sql` covers migration 16 (public school-image submissions: the insert-only `submissions/` storage policy, `submit_school_image`, the duplicate rule shared with administrator uploads, review, primary only when approved).
 `09_school_images.test.sql` covers migration 15 (school images). Run them all with
 `node supabase/verification/emulator/run-db-tests.mjs` after `npm install --no-save @electric-sql/pglite` (or set `PGLITE_ROOT`).
 `08_school_file_submissions.test.sql` covers migration 14 (public submission limits, privacy of contact details and notes, the review function, history, summary counts, records made before the migration).
@@ -45,7 +46,7 @@ all seven test files were executed in an in-memory PostgreSQL emulator (PGlite) 
   and `storage.buckets`/`storage.objects` with RLS on;
 - supplies a tiny pgTAP-compatible set of functions (`plan`, `ok`, `is`, `isnt`, `throws_ok`, `lives_ok`, `is_empty`, `finish`).
 
-Results of the latest run (Phase 3): all 15 migrations apply in order, `seed.sql` loads, **406 assertions pass, 0 fail**.
+Results of the latest local emulator run: all 16 migrations apply in order, `seed.sql` loads, **452 assertions pass, 0 fail**.
 **Mutation check:** seven deliberate weakenings (anon `SELECT` on students, RLS disabled on orders, anon execute on an admin
 function, tracking that ignores the code, public bucket, an anon storage policy, update grant on the approval column) were
 each caught by at least one test.

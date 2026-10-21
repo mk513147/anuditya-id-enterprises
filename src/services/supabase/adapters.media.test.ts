@@ -100,6 +100,91 @@ describe('school images (Supabase)', () => {
   })
 })
 
+describe('public school image submissions (Supabase)', () => {
+  const FIELDS = { schoolId: SCHOOL, contactPerson: 'Asha Teacher', contactDetails: '+91 98765 43210', note: ' Front gate ' }
+  const open: Responder = (c) => {
+    if (c.target === 'list_active_schools') return { data: [{ id: SCHOOL, name: 'Image School' }] }
+    if (c.target === 'school_image_already_present') return { data: false }
+    if (c.target === 'submit_school_image') return { data: [{ status: 'submitted' }] }
+    return undefined
+  }
+
+  it('uploads to the content-named submissions/<school>/<sha256>.<ext> path without overwriting, then registers it as a submission', async () => {
+    const { repos, calls } = setup(open)
+    expect(await repos.schoolRepository.submitImage(FIELDS, jpeg())).toBe('submitted')
+    const upload = calls.find((c) => c.kind === 'upload')!
+    const { path, options } = upload.args as { path: string; options: { upsert: boolean } }
+    expect(upload.target).toBe('school-images')
+    expect(path).toMatch(new RegExp(`^submissions/${SCHOOL}/[0-9a-f]{64}\\.jpg$`))
+    expect(options.upsert).toBe(false)
+    const reg = calls.find((c) => c.target === 'submit_school_image')!
+    expect(reg.args).toEqual({
+      p_school_id: SCHOOL, p_contact_person: 'Asha Teacher', p_contact_details: '9876543210', p_storage_path: path,
+      p_original_name: 'Front gate.jpg', p_sha256: path.slice(-68, -4), p_note: 'Front gate',
+    })
+    // Never an administrator function, never a delete.
+    expect(calls.some((c) => c.kind === 'rpc' && c.target.startsWith('admin_'))).toBe(false)
+    expect(calls.some((c) => c.kind === 'remove')).toBe(false)
+  })
+
+  it('skips the upload entirely when the school already has the image', async () => {
+    const { repos, calls } = setup((c) => (c.target === 'school_image_already_present' ? { data: true } : open(c)))
+    expect(await repos.schoolRepository.submitImage(FIELDS, jpeg())).toBe('already_present')
+    expect(calls.some((c) => c.kind === 'upload' || c.target === 'submit_school_image')).toBe(false)
+  })
+
+  it('a retry that finds its own object already stored re-registers it (no second object, nothing removed)', async () => {
+    const { repos, calls } = setup((c) =>
+      c.kind === 'upload' ? { error: { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' } } : c.target === 'submit_school_image' ? { data: [{ status: 'already_present' }] } : open(c),
+    )
+    expect(await repos.schoolRepository.submitImage(FIELDS, jpeg())).toBe('already_present')
+    expect(calls.filter((c) => c.target === 'submit_school_image')).toHaveLength(1)
+    expect(calls.some((c) => c.kind === 'remove')).toBe(false)
+  })
+
+  it.each([
+    [{ code: '22023', message: 'invalid_image' }, 'invalid_input'],
+    [{ code: 'P0001', message: 'image_not_uploaded' }, 'unknown'],
+    [{ code: 'P0001', message: 'school_unavailable' }, 'school_unavailable'],
+    [{ code: '', message: 'TypeError: Failed to fetch' }, 'network'],
+  ] as const)('a registration failure (%j) reports %s and never deletes (visitors cannot)', async (error, code) => {
+    const { repos, calls } = setup((c) => (c.target === 'submit_school_image' ? { error } : open(c)))
+    const e = await rejection(repos.schoolRepository.submitImage(FIELDS, jpeg()))
+    expect(isRepositoryError(e, code)).toBe(true)
+    expect(String((e as Error).message)).not.toMatch(/submissions\/|[0-9a-f]{64}|P0001|22023/)
+    expect(calls.some((c) => c.kind === 'remove')).toBe(false)
+  })
+
+  it('refuses invalid fields, invalid images and inactive schools before anything is uploaded', async () => {
+    for (const [fields, file] of [
+      [{ ...FIELDS, contactDetails: '123' }, jpeg()],
+      [{ ...FIELDS, note: 'x'.repeat(501) }, jpeg()],
+      [FIELDS, new File(['<svg/>'], 'logo.jpg', { type: 'image/jpeg' })],
+    ] as const) {
+      const { repos, calls } = setup(open)
+      expect(isRepositoryError(await rejection(repos.schoolRepository.submitImage(fields, file)), 'invalid_input')).toBe(true)
+      expect(calls).toHaveLength(0)
+    }
+    const { repos, calls } = setup((c) => (c.target === 'list_active_schools' ? { data: [] } : open(c)))
+    expect(isRepositoryError(await rejection(repos.schoolRepository.submitImage(FIELDS, jpeg())), 'school_unavailable')).toBe(true)
+    expect(calls.some((c) => c.kind === 'upload')).toBe(false)
+  })
+
+  it('the administrator reviews through admin_review_school_image; primary needs approval; pending counts are grouped', async () => {
+    const { repos, calls } = setup(() => ({ data: [{ image_id: IMAGE, review_status: 'approved' }] }))
+    await repos.schoolRepository.reviewImage(IMAGE, 'approved')
+    expect(calls[0]).toMatchObject({ kind: 'rpc', target: 'admin_review_school_image', args: { p_image_id: IMAGE, p_decision: 'approved' } })
+    const notApproved = setup(() => ({ error: { code: 'P0001', message: 'not_approved' } }))
+    expect(isRepositoryError(await rejection(notApproved.repos.schoolRepository.setPrimaryImage(IMAGE)), 'invalid_status')).toBe(true)
+    const counts = setup(() => ({ data: [{ school_id: 'a', school: { name: 'B school' } }, { school_id: 'c', school: { name: 'A school' } }, { school_id: 'c', school: { name: 'A school' } }] }))
+    expect(await counts.repos.schoolRepository.pendingImageCounts()).toEqual([
+      { schoolId: 'c', schoolName: 'A school', count: 2 },
+      { schoolId: 'a', schoolName: 'B school', count: 1 },
+    ])
+    expect(opArgs(counts.calls[0], 'eq')).toContainEqual(['review_status', 'pending'])
+  })
+})
+
 describe('student photos for the export (Supabase)', () => {
   const A = '11111111-1111-4111-8111-111111111111'
   const B = '22222222-2222-4222-8222-222222222222'

@@ -49,6 +49,7 @@ describe('the browser calls only real database functions, with their real parame
         'admin_summary', 'list_active_schools', 'resolve_school', 'submit_student', 'admin_review_student', 'track_order', 'admin_create_order',
         'admin_rotate_tracking_code', 'admin_set_order_status', 'list_enabled_services', 'list_published_advertisements', 'list_approved_feedback',
         'submit_feedback', 'submit_school_file', 'admin_review_file', 'admin_register_school_image', 'admin_set_primary_school_image',
+        'school_image_already_present', 'submit_school_image', 'admin_review_school_image',
       ]),
     )
   })

@@ -46,6 +46,30 @@ Migration `20261014090001_school_images.sql` (**not applied to any hosted projec
 - No public page shows school images yet; they are administrator-only. Showing them publicly would need a deliberate
   design (for example a separate public bucket for selected images), not a change to this private bucket.
 
+## Public submissions ("File Upload" page → "Submit School Images")
+
+Migration `20261015090001_public_school_image_submissions.sql` (**not applied to any hosted project yet**).
+
+- One system: the same `school-images` bucket, `school_images` table, browser checks (`inspectImage`), batch queue
+  (`ImageQueue`, `runBatch`) and duplicate rule (unique school + SHA-256) as the administrator uploader. A public image and
+  an administrator image of the same school can never both exist, in either order.
+- The form sends school, contact person, contact details (email or 10-digit mobile, same rules as the data file form), an
+  optional note (500 characters) and up to 20 images. Each image gets its own outcome: submitted / already present / not
+  accepted / failed (retry sends only the failed ones). The form is cleared only when nothing failed.
+- Visitors never call an `admin_*` function. They can: ask `school_image_already_present(school, sha256)` (skips the upload
+  of an image the school already has; it only confirms an image the caller already holds byte for byte), upload to
+  `submissions/<active school id>/<sha256>.<jpg|png|webp>` (INSERT only, no read, list, overwrite or delete), and call
+  `submit_school_image`, which re-checks the active school, the fields, that the path is exactly the checksum name, that
+  the object exists with a matching type and size ≤ 5 MB, and the duplicate rule. The record is always `pending`,
+  `source = 'public'`, never primary; the caller cannot choose the status, primary flag or order.
+- Content naming makes retries safe: a second upload of the same image finds "already exists" (its own object) and only
+  re-registers, which returns `already_present`. No second object or record is ever made.
+- The administrator sees "Awaiting review" (thumbnail, submitter, note, Approve / Reject) on the school page, a banner on
+  the Schools list, and a collapsible "rejected" list. Only approved images can be made primary (enforced by a check
+  constraint and by `admin_set_primary_school_image`); the primary image cannot be rejected.
+- Not implemented: removing rejected objects or objects that were uploaded but never registered (a visitor who closed the
+  page mid-upload). They stay private and unused; a cleanup job would need the service role and is out of scope.
+
 ## Applying the migration (after review)
 
 ```

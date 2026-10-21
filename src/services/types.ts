@@ -1,5 +1,5 @@
 import type { AdVisibility } from '@/lib/advertisements'
-import type { FileReviewEvent, FileReviewStatus, SchoolFileSubmission, SchoolImage, Advertisement, ServiceCategory, ServiceInput, AdvertisementInput, FeedbackStatus, OrderInput, OrderStatus, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, UploadedFile, UploadedFileType, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
+import type { FileReviewEvent, FileReviewStatus, SchoolFileSubmission, SchoolImage, SchoolImageStatus, SchoolImageSubmission, SchoolImageSubmitResult, Advertisement, ServiceCategory, ServiceInput, AdvertisementInput, FeedbackStatus, OrderInput, OrderStatus, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, UploadedFile, UploadedFileType, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
 
 /**
  * Repository contracts. The UI depends only on these interfaces. Two implementations exist: `services/supabase/*`
@@ -370,8 +370,18 @@ export interface SchoolRepository {
    * registration fails after the upload, the uploaded object is removed again where possible.
    */
   uploadImage(schoolId: ID, file: File, options?: { altText?: string }): Promise<SchoolImage>
-  /** Makes an image the school's primary image (the previous one stays, as a normal image). Rejects 'not_found' | 'no_change'. */
+  /** Makes an APPROVED image the school's primary image (the previous one stays). Rejects 'not_found' | 'no_change' | 'invalid_status'. */
   setPrimaryImage(imageId: ID): Promise<void>
+  /** Administrator decision on an image (normally a public submission). Rejects 'not_found' | 'no_change' | 'invalid_status' (the primary image). */
+  reviewImage(imageId: ID, decision: SchoolImageStatus): Promise<void>
+  /** Schools with public image submissions waiting for review (administrator only). */
+  pendingImageCounts(): Promise<{ schoolId: ID; schoolName: string; count: number }[]>
+  /**
+   * PUBLIC "Submit School Images": one image for an active school, using the same bucket, checks and duplicate rule as
+   * uploadImage. Stored as pending review, never primary. Resolves 'already_present' (and stores nothing) when the school
+   * already has this exact image. Rejects 'invalid_input' | 'school_unavailable' | a transport error.
+   */
+  submitImage(input: SchoolImageSubmission, file: File): Promise<SchoolImageSubmitResult>
 }
 
 export interface DashboardCounts {

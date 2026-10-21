@@ -32,7 +32,27 @@ export interface SchoolImage {
   createdAt: ISODate
   /** Short-lived preview link (a few minutes). Never stored or logged. */
   url: string
+  /** Administrator uploads are approved immediately; public submissions wait for review. Only approved images can be primary. */
+  reviewStatus: SchoolImageStatus
+  source: 'admin' | 'public'
+  /** Who submitted it (public submissions only). Administrator only. */
+  submission?: { contactPerson: string; contactDetails: string; note?: string }
+  reviewedAt?: ISODate
 }
+
+export type SchoolImageStatus = 'pending' | 'approved' | 'rejected'
+
+/** The details the public "Submit School Images" form sends with each image. */
+export interface SchoolImageSubmission {
+  schoolId: ID
+  contactPerson: string
+  /** An email address or a 10-digit mobile number. */
+  contactDetails: string
+  note?: string
+}
+
+/** Outcome of one public image submission: stored for review, or the school already has this exact image. */
+export type SchoolImageSubmitResult = 'submitted' | 'already_present'
 
 /** Editable school fields (everything the admin form controls). */
 export type SchoolInput = Pick<School, 'name' | 'slug' | 'code' | 'contactPerson' | 'phone' | 'email' | 'address'>

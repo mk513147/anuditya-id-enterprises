@@ -3,6 +3,7 @@ import { CtaBanner } from '@/components/shared/CtaBanner'
 import { PageHero } from '@/components/shared/PageHero'
 import { Reveal } from '@/components/shared/Reveal'
 import { FileUploadFlow } from '@/features/uploads/components/FileUploadFlow'
+import { SchoolImageSubmissionForm } from '@/features/uploads/components/SchoolImageSubmissionForm'
 import { UploadHelp } from '@/features/uploads/components/UploadHelp'
 import { usePageTitle } from '@/hooks/usePageTitle'
 import { waMessages } from '@/lib/whatsapp'
@@ -48,6 +49,15 @@ export function FileUploadPage() {
           </Reveal>
           <UploadHelp />
         </div>
+
+        {/* A separate submission with its own fields and button: images are reviewed before they are used. */}
+        <section id="school-images" aria-label="School images" className="mx-auto mt-10 max-w-6xl scroll-mt-24 sm:mt-14">
+          <div className="lg:max-w-[calc(100%-22rem)]">
+            <Reveal className="min-w-0">
+              <SchoolImageSubmissionForm />
+            </Reveal>
+          </div>
+        </section>
       </div>
 
       <CtaBanner

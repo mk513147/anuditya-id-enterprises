@@ -19,14 +19,15 @@ select is((select allowed_mime_types from storage.buckets where id = 'student-ph
 select is((select 'text/csv' = any (allowed_mime_types) and 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' = any (allowed_mime_types)
                   and not ('application/pdf' = any (allowed_mime_types)) from storage.buckets where id = 'school-uploads'), true, 'the spreadsheet bucket accepts spreadsheets only');
 select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and ('anon' = any (roles) or 'public' = any (roles))),
-  array['INSERT', 'INSERT'],
-  'anon has only the two insert-only upload policies (Phase 3): no anon SELECT, UPDATE or DELETE on storage');
+  array['INSERT', 'INSERT', 'INSERT'],
+  'anon has only the three insert-only upload policies (photos, spreadsheets, school images): no anon SELECT, UPDATE or DELETE on storage');
 select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) not like '%school-images%'), array['INSERT', 'INSERT', 'SELECT'],
   'for the student-photo and spreadsheet buckets: two insert-only upload policies and the administrator read policy; no client update or delete');
 select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) like '%school-images%'),
-  array['DELETE', 'INSERT', 'SELECT'], 'the school-image bucket (migration 20261014090001) has administrator-only insert, read and orphan-only delete');
-select is((select bool_and(roles = array['authenticated']::name[] and (coalesce(qual, '') || coalesce(with_check, '')) ~ 'is_admin') from pg_policies
-  where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) like '%school-images%'), true, 'and every school-image policy requires the administrator');
+  array['DELETE', 'INSERT', 'INSERT', 'SELECT'], 'the school-image bucket: administrator insert, read and orphan-only delete, plus the public insert-only submissions folder (migration 20261015090001)');
+select is((select bool_and(case when 'anon' = any (roles) then cmd = 'INSERT' and with_check ~ 'submissions/' else roles = array['authenticated']::name[] and (coalesce(qual, '') || coalesce(with_check, '')) ~ 'is_admin' end)
+  from pg_policies where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) like '%school-images%'), true,
+  'every school-image policy requires the administrator, except the anonymous INSERT-only submissions folder');
 
 -- Objects, as the trusted server would have written them (service_role bypasses RLS) -----------------------------------------------------------
 set local role service_role;

@@ -3,7 +3,7 @@ import { describeError, isRepositoryError } from '@/services/errors'
 import { checkImageFile, SCHOOL_IMAGE_MAX_BATCH } from '@/validations/schoolImage'
 
 /**
- * Bulk school-image upload queue. Each file has its own outcome; a batch is never reported as a whole success when some
+ * Bulk school-image upload queue, shared by the administrator uploader and the public "Submit School Images" form. Each file has its own outcome; a batch is never reported as a whole success when some
  * files failed. Retrying sends only the files that failed (never one that already uploaded).
  */
 export type QueueStatus = 'ready' | 'uploading' | 'done' | 'failed' | 'invalid' | 'duplicate'
@@ -16,6 +16,7 @@ export interface QueueItem {
 }
 
 export const UPLOAD_CONCURRENCY = 3
+const ALREADY_PRESENT = 'Already present for this school.'
 
 /** Same file chosen twice (picker or drop) = same key, so it is only queued once. */
 export const fileKey = (f: File) => `${f.name}\u0000${f.size}\u0000${f.lastModified}`
@@ -54,13 +55,18 @@ export async function runBatch(
   await forEachLimit(todo, concurrency, async (item) => {
     onUpdate(item.key, { status: 'uploading', message: undefined })
     try {
-      await upload(item.file)
+      // The public submission resolves 'already_present' (nothing stored) when the school already has this exact image.
+      if ((await upload(item.file)) === 'already_present') {
+        tally.duplicate++
+        onUpdate(item.key, { status: 'duplicate', message: ALREADY_PRESENT })
+        return
+      }
       tally.done++
       onUpdate(item.key, { status: 'done', message: undefined })
     } catch (e) {
       if (isRepositoryError(e, 'duplicate_image')) {
         tally.duplicate++
-        onUpdate(item.key, { status: 'duplicate', message: 'Already added to this school.' })
+        onUpdate(item.key, { status: 'duplicate', message: ALREADY_PRESENT })
       } else if (isRepositoryError(e, 'invalid_input')) {
         tally.invalid++
         onUpdate(item.key, { status: 'invalid', message: e.message })

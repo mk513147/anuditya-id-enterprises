@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { schoolRepository } from '@/services'
 import type { SchoolListParams } from '@/services/types'
-import type { ID, SchoolInput } from '@/types'
+import type { ID, SchoolImageStatus, SchoolImageSubmission, SchoolInput } from '@/types'
 
 export const schoolKeys = {
   all: ['schools'] as const,
@@ -58,3 +58,19 @@ export function useSetPrimaryImage(schoolId: ID) {
   const qc = useQueryClient()
   return useMutation({ mutationFn: (imageId: ID) => schoolRepository.setPrimaryImage(imageId), onSuccess: () => qc.invalidateQueries({ queryKey: ['schools', 'images', schoolId] }) })
 }
+
+/** Approve / reject a school image (normally a public submission). */
+export function useReviewImage(schoolId: ID) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { id: ID; decision: SchoolImageStatus }) => schoolRepository.reviewImage(v.id, v.decision),
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: ['schools', 'images', schoolId] }), qc.invalidateQueries({ queryKey: ['schools', 'pending-images'] })]),
+  })
+}
+
+/** Schools with public image submissions waiting for review. */
+export const usePendingImageCounts = () =>
+  useQuery({ queryKey: ['schools', 'pending-images'], queryFn: () => schoolRepository.pendingImageCounts(), staleTime: 0, retry: false })
+
+/** Public: submit one image for review (the batch runner calls this per file). Not kept in the mutation cache. */
+export const submitSchoolImage = (input: SchoolImageSubmission, file: File) => schoolRepository.submitImage(input, file)

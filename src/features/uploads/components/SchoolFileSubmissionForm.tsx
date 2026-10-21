@@ -1,14 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, Info, Loader2, Send } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { FormField } from '@/components/shared/FormField'
 import { WhatsAppButton } from '@/components/shared/WhatsAppButton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
-import { useActiveSchools } from '@/features/schools/hooks'
 import { waMessages } from '@/lib/whatsapp'
 import { describeError, isRepositoryError } from '@/services/errors'
 import { FILE_CATEGORIES, FILE_CATEGORY_LABEL, type FileUploadResult } from '@/types'
@@ -18,46 +17,12 @@ import {
 import { FILE_INPUT_ACCEPT, sniffSpreadsheet, validateUploadFile } from '@/validations/upload'
 import { useSubmitSchoolFile } from '../hooks'
 import { FileDropzone } from './FileDropzone'
+import { SchoolSelect } from './SchoolSelect'
 import { SelectedFileCard } from './SelectedFileCard'
 import { UploadProgress } from './UploadProgress'
 
 const FIELD_KEYS = ['schoolId', 'contactPerson', 'contactDetails', 'category', 'description', 'instructions'] as const
 const inputCls = 'h-11 text-base'
-
-function SchoolSelect({ error, field }: { error?: string; field: UseFormRegisterReturn }) {
-  const { data: schools, isPending, isError, refetch } = useActiveSchools()
-  const noSchools = !isPending && !isError && schools.length === 0
-  return (
-    <div>
-      <FormField
-        id="sd-school"
-        label="School name"
-        required
-        hint={noSchools || isError ? undefined : 'Choose the school this file is for.'}
-        error={error ?? (isError ? 'Could not load the school list.' : undefined)}
-      >
-        {(c) => (
-          <NativeSelect {...c} {...field} disabled={isPending || isError || noSchools}>
-            <option value="" disabled>
-              {isPending ? 'Loading schools…' : noSchools ? 'No schools available' : 'Select school'}
-            </option>
-            {schools?.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </NativeSelect>
-        )}
-      </FormField>
-      {isError && (
-        <Button type="button" variant="outline" size="sm" className="-mt-1 mb-2 h-10" onClick={() => void refetch()}>
-          Try loading again
-        </Button>
-      )}
-      {noSchools && <p className="-mt-1 mb-2 text-sm text-ink">No schools are accepting files right now. Please contact us on WhatsApp.</p>}
-    </div>
-  )
-}
 
 /**
  * "Submit School Data File". Every field is validated here, again in the repository, and again by the database.
@@ -163,7 +128,7 @@ export function SchoolFileSubmissionForm({ onSubmitted }: { onSubmitted: (result
 
       <fieldset disabled={sub.isPending} className="mt-5 grid gap-x-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <SchoolSelect error={errors.schoolId?.message} field={register('schoolId')} />
+          <SchoolSelect id="sd-school" error={errors.schoolId?.message} field={register('schoolId')} />
         </div>
         <FormField id="sd-person" label="Contact person" required hint="The person submitting this file" error={errors.contactPerson?.message}>
           {(c) => <Input {...c} {...register('contactPerson')} autoComplete="name" maxLength={CONTACT_PERSON_MAX} className={inputCls} />}

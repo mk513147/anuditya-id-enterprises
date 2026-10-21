@@ -1,3 +1,6 @@
+import { z } from 'zod'
+import { schoolFileFieldsSchema } from './fileSubmission'
+
 /**
  * Rules for school images, shared by the uploader UI and both repositories (the database and the `school-images` bucket
  * enforce the same limits again: JPEG / PNG / WebP, at most 5 MB). SVG is deliberately not accepted.
@@ -66,3 +69,15 @@ export async function inspectImage(file: File): Promise<ImageCheck> {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
   return { ok: true, type, sha256: Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('') }
 }
+
+export const IMAGE_NOTE_MAX = 500
+
+/**
+ * The text fields of the public "Submit School Images" form. School, contact person and contact details use exactly the
+ * rules of the school data file form; the note is optional.
+ */
+export const schoolImageSubmissionSchema = schoolFileFieldsSchema
+  .pick({ schoolId: true, contactPerson: true, contactDetails: true })
+  .extend({ note: z.string().trim().max(IMAGE_NOTE_MAX, `The description must be ${IMAGE_NOTE_MAX} characters or fewer.`) })
+
+export type SchoolImageSubmissionValues = z.input<typeof schoolImageSubmissionSchema>

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
+import { PendingImagesBanner } from '@/features/schools/components/PendingImagesBanner'
 import { SchoolFormDialog } from '@/features/schools/components/SchoolFormDialog'
 import { SchoolRowActions } from '@/features/schools/components/SchoolRowActions'
 import { SchoolStatusDialog } from '@/features/schools/components/SchoolStatusDialog'
@@ -84,6 +85,8 @@ export function AdminSchoolsPage() {
           </Button>
         }
       />
+
+      <PendingImagesBanner />
 
       <AdminCard>
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-end sm:p-5">

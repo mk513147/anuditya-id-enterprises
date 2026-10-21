@@ -64,14 +64,14 @@ select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')),
   array['list_active_schools', 'list_approved_feedback', 'list_enabled_services', 'list_published_advertisements',
-        'resolve_school', 'submit_feedback', 'submit_school_file', 'submit_student', 'track_order'],
-  'anon can execute exactly the nine intended public functions');
+        'resolve_school', 'school_image_already_present', 'submit_feedback', 'submit_school_file', 'submit_school_image', 'submit_student', 'track_order'],
+  'anon can execute exactly the eleven intended public functions');
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname like 'admin\_%' and has_function_privilege('authenticated', p.oid, 'execute')),
-  array['admin_create_order', 'admin_register_school_image', 'admin_review_file', 'admin_review_student', 'admin_rotate_tracking_code', 'admin_set_order_status',
-        'admin_set_primary_school_image', 'admin_summary'],
-  'authenticated can execute the eight administrator functions (each re-checks is_admin)');
+  array['admin_create_order', 'admin_register_school_image', 'admin_review_file', 'admin_review_school_image', 'admin_review_student', 'admin_rotate_tracking_code',
+        'admin_set_order_status', 'admin_set_primary_school_image', 'admin_summary'],
+  'authenticated can execute the nine administrator functions (each re-checks is_admin)');
 select is(
   (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname like 'admin\_%' and has_function_privilege('anon', p.oid, 'execute'))::int,

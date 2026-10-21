@@ -20,12 +20,12 @@ cfg as (
     case when '<INTENDED_ADMIN_EMAIL>'   like '<%' then null else lower(btrim('<INTENDED_ADMIN_EMAIL>')) end as email
 ),
 
--- The 15 migration versions in this repository (supabase/migrations/), in order. A repository test keeps this list in sync.
+-- The 16 migration versions in this repository (supabase/migrations/), in order. A repository test keeps this list in sync.
 expected as (
   select array[
     '20261011150001', '20261011150002', '20261011150003', '20261011150004', '20261011150005', '20261011150006',
     '20261011150007', '20261011150008', '20261011150009', '20261011150010', '20261011150011', '20261011160001',
-    '20261012090001', '20261013090001', '20261014090001'
+    '20261012090001', '20261013090001', '20261014090001', '20261015090001'
   ]::text[] as versions
 ),
 
@@ -53,10 +53,10 @@ checks(n, name, result, detail) as (
   select 1, 'migration history table exists',
          case when h.has_table then 'PASS' else 'INCONCLUSIVE' end,
          case when h.has_table then 'supabase_migrations.schema_migrations found.'
-              else 'Not found. Check Dashboard > Database > Migrations (or run: npx supabase migration list --linked) and confirm the 15 versions by hand.' end
+              else 'Not found. Check Dashboard > Database > Migrations (or run: npx supabase migration list --linked) and confirm the 16 versions by hand.' end
   from hist h
   union all
-  select 2, 'applied migrations are exactly the 15 expected versions, no missing and no unexpected',
+  select 2, 'applied migrations are exactly the 16 expected versions, no missing and no unexpected',
          case when not h.has_table then 'INCONCLUSIVE' when h.applied = e.versions then 'PASS' else 'FAIL' end,
          case when not h.has_table then 'Cannot read the history table; verify by hand.'
               when h.applied = e.versions then '12 versions, identical to supabase/migrations/. (Only the version set and its order are comparable; apply timestamps are not recorded here.)'

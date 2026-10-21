@@ -173,3 +173,61 @@ describe('demo repository: school images', () => {
     expect(JSON.stringify(list)).not.toMatch(/sha256/)
   })
 })
+
+describe('demo repository: public school image submissions', () => {
+  beforeEach(() => {
+    db.schoolImages.length = 0
+  })
+  const school = () => db.schools.find((s) => s.isActive)!.id
+  const fields = () => ({ schoolId: school(), contactPerson: 'Asha Teacher', contactDetails: '+91 98765 43210', note: '  Front gate  ' })
+
+  it('stores a submission as pending, never primary, with the submitter details (normalised)', async () => {
+    expect(await repo.submitImage(fields(), img('gate.jpg', JPEG_HEAD, '', 'p1'))).toBe('submitted')
+    const [i] = await repo.listImages(school())
+    expect(i).toMatchObject({ reviewStatus: 'pending', source: 'public', isPrimary: false, submission: { contactPerson: 'Asha Teacher', contactDetails: '9876543210', note: 'Front gate' } })
+  })
+
+  it('shares the duplicate rule with the administrator uploader, in both directions', async () => {
+    await repo.uploadImage(school(), img('a.jpg', JPEG_HEAD, '', 'shared'))
+    expect(await repo.submitImage(fields(), img('copy.jpg', JPEG_HEAD, '', 'shared'))).toBe('already_present')
+    expect(await repo.submitImage(fields(), img('b.jpg', JPEG_HEAD, '', 'second'))).toBe('submitted')
+    expect(await repo.submitImage(fields(), img('b-again.jpg', JPEG_HEAD, '', 'second'))).toBe('already_present')
+    expect(isRepositoryError(await rejection(repo.uploadImage(school(), img('b-admin.jpg', JPEG_HEAD, '', 'second'))), 'duplicate_image')).toBe(true)
+    expect(db.schoolImages).toHaveLength(2)
+  })
+
+  it('refuses invalid fields, invalid images and schools that are not accepting submissions', async () => {
+    expect(isRepositoryError(await rejection(repo.submitImage({ ...fields(), contactDetails: '12345' }, img('a.jpg', JPEG_HEAD))), 'invalid_input')).toBe(true)
+    expect(isRepositoryError(await rejection(repo.submitImage({ ...fields(), note: 'x'.repeat(501) }, img('a.jpg', JPEG_HEAD))), 'invalid_input')).toBe(true)
+    expect(isRepositoryError(await rejection(repo.submitImage(fields(), new File(['<svg/>'], 'logo.svg'))), 'invalid_input')).toBe(true)
+    const inactive = db.schools.find((s) => !s.isActive)
+    if (inactive) expect(isRepositoryError(await rejection(repo.submitImage({ ...fields(), schoolId: inactive.id }, img('a.jpg', JPEG_HEAD))), 'school_unavailable')).toBe(true)
+    expect(isRepositoryError(await rejection(repo.submitImage({ ...fields(), schoolId: 'sch-nope' }, img('a.jpg', JPEG_HEAD))), 'school_unavailable')).toBe(true)
+    expect(db.schoolImages).toHaveLength(0)
+  })
+
+  it('only approved images can become primary; the administrator approves, rejects and lists pending counts', async () => {
+    await repo.uploadImage(school(), img('admin.jpg', JPEG_HEAD, '', 'adm'))
+    await repo.submitImage(fields(), img('pub.jpg', JPEG_HEAD, '', 'pub'))
+    const pub = (await repo.listImages(school())).find((i) => i.source === 'public')!
+    expect(await repo.pendingImageCounts()).toEqual([expect.objectContaining({ schoolId: school(), count: 1 })])
+    expect(isRepositoryError(await rejection(repo.setPrimaryImage(pub.id)), 'invalid_status')).toBe(true)
+    await repo.reviewImage(pub.id, 'rejected')
+    expect(isRepositoryError(await rejection(repo.setPrimaryImage(pub.id)), 'invalid_status')).toBe(true)
+    await repo.reviewImage(pub.id, 'approved')
+    expect(await repo.pendingImageCounts()).toEqual([])
+    await repo.setPrimaryImage(pub.id)
+    expect((await repo.listImages(school())).find((i) => i.id === pub.id)).toMatchObject({ isPrimary: true, reviewStatus: 'approved' })
+    expect(isRepositoryError(await rejection(repo.reviewImage(pub.id, 'rejected')), 'invalid_status')).toBe(true) // the primary image stays approved
+    expect(isRepositoryError(await rejection(repo.reviewImage(pub.id, 'approved')), 'no_change')).toBe(true)
+  })
+
+  it('the shared batch runner reports "already present" for a public duplicate', async () => {
+    await repo.uploadImage(school(), img('a.jpg', JPEG_HEAD, '', 'dup'))
+    const queue: QueueItem[] = [img('x.jpg', JPEG_HEAD, '', 'dup', 1), img('y.jpg', JPEG_HEAD, '', 'new', 2)].map((f) => ({ key: fileKey(f), file: f, status: 'ready' }))
+    const seen: Record<string, string> = {}
+    const t = await runBatch(queue, (f) => repo.submitImage(fields(), f), { onUpdate: (k, p) => { if (p.status) seen[k] = p.status } })
+    expect(t).toEqual({ done: 1, failed: 0, duplicate: 1, invalid: 0 })
+    expect(Object.values(seen).sort()).toEqual(['done', 'duplicate'])
+  })
+})

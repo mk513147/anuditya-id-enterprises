@@ -46,3 +46,15 @@ export function useSetSchoolActive() {
   const invalidate = useInvalidateAfterWrite()
   return useMutation({ mutationFn: (v: { id: ID; isActive: boolean }) => schoolRepository.setActive(v.id, v.isActive), onSuccess: invalidate })
 }
+
+/**
+ * A school's images with short-lived preview links (5 minutes). Kept in memory only, for a minute, and refreshed before
+ * the links expire.
+ */
+export const useSchoolImages = (schoolId: ID) =>
+  useQuery({ queryKey: ['schools', 'images', schoolId], queryFn: () => schoolRepository.listImages(schoolId), staleTime: 60_000, gcTime: 60_000, refetchInterval: 4 * 60_000, retry: false })
+
+export function useSetPrimaryImage(schoolId: ID) {
+  const qc = useQueryClient()
+  return useMutation({ mutationFn: (imageId: ID) => schoolRepository.setPrimaryImage(imageId), onSuccess: () => qc.invalidateQueries({ queryKey: ['schools', 'images', schoolId] }) })
+}

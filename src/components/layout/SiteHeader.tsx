@@ -29,10 +29,15 @@ export function SiteHeader() {
       )}
     >
       <div className="container-page flex h-16 items-center justify-between gap-4 xl:h-[72px]">
-        <Logo />
+        <Logo variant="responsive" />
 
-        <nav aria-label="Main" className="hidden xl:block">
-          <ul className="flex items-center gap-0.5 2xl:gap-1">
+        {/*
+          The row is capped at max-w-7xl (1216px of content) at every desktop width, so nothing here may grow at wider
+          breakpoints: logo (~226px) + navigation (~710px) + contact controls (up to ~172px) must fit that one width.
+          Labels never wrap, and the navigation does not shrink below its content.
+        */}
+        <nav aria-label="Main" className="hidden shrink-0 xl:block">
+          <ul className="flex items-center gap-0.5">
             {NAV_ITEMS.map((item) => (
               <li key={item.to}>
                 <NavLink
@@ -40,7 +45,7 @@ export function SiteHeader() {
                   end={item.to === '/'}
                   className={({ isActive }) =>
                     cn(
-                      'relative rounded-lg px-2.5 py-2 text-sm font-medium text-muted-ink transition-colors hover:bg-royal-50 hover:text-navy-900 2xl:px-3.5',
+                      'relative whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium text-muted-ink transition-colors hover:bg-royal-50 hover:text-navy-900',
                       isActive && 'text-royal-600 after:absolute after:inset-x-3 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-gold-500',
                     )
                   }
@@ -52,10 +57,10 @@ export function SiteHeader() {
           </ul>
         </nav>
 
-        <div className="hidden items-center gap-2 xl:flex">
+        <div className="hidden shrink-0 items-center gap-2 xl:flex">
           <WhatsAppButton size="sm" className="h-10" iconOnly label="WhatsApp" />
           <CallButton size="sm" className="h-10" iconOnly label="Call" />
-          <span className="hidden text-sm font-semibold text-navy-900 2xl:inline">{BUSINESS.phone}</span>
+          <span className="hidden whitespace-nowrap text-sm font-semibold text-navy-900 2xl:inline">{BUSINESS.phone}</span>
         </div>
 
         <Sheet open={open} onOpenChange={setOpen}>
@@ -68,7 +73,7 @@ export function SiteHeader() {
             <SheetHeader className="flex-row items-center justify-between border-b p-4">
               <SheetTitle className="sr-only">Menu</SheetTitle>
               <SheetDescription className="sr-only">Site navigation and contact actions</SheetDescription>
-              <Logo showTagline={false} />
+              <Logo variant="compact" className="h-8" />
               <SheetClose asChild>
                 <Button variant="ghost" size="icon" aria-label="Close menu">
                   <X className="size-6" />

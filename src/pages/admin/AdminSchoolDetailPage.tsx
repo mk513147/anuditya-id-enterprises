@@ -6,6 +6,7 @@ import { ActiveBadge } from '@/components/admin/StatusBadge'
 import { ErrorState, SkeletonBlock } from '@/components/shared/QueryState'
 import { Button } from '@/components/ui/button'
 import { SchoolFormDialog } from '@/features/schools/components/SchoolFormDialog'
+import { SchoolImagesPanel } from '@/features/schools/components/SchoolImagesPanel'
 import { SchoolStatusDialog } from '@/features/schools/components/SchoolStatusDialog'
 import { useSchoolDetail } from '@/features/schools/hooks'
 import { copySchoolLink } from '@/features/schools/schoolActions'
@@ -155,6 +156,10 @@ export function AdminSchoolDetailPage() {
             ))}
           </ul>
         </AdminCard>
+      </div>
+
+      <div className="mt-6">
+        <SchoolImagesPanel schoolId={school.id} />
       </div>
 
       <SchoolFormDialog open={editOpen} onOpenChange={setEditOpen} school={school} />

@@ -6,7 +6,7 @@
 import type { Client } from './shared'
 
 export interface RecordedCall {
-  kind: 'from' | 'rpc' | 'upload' | 'signedUrl'
+  kind: 'from' | 'rpc' | 'upload' | 'signedUrl' | 'signedUrls' | 'remove' | 'download'
   /** Table, function or bucket name. */
   target: string
   args?: unknown
@@ -71,6 +71,21 @@ export function createFakeClient(responder: Responder = () => undefined) {
           },
           async createSignedUrl(path: string, expiresIn: number, options?: unknown) {
             const call: RecordedCall = { kind: 'signedUrl', target: bucket, args: { path, expiresIn, options }, ops: [] }
+            calls.push(call)
+            return respond(call)
+          },
+          async createSignedUrls(paths: string[], expiresIn: number) {
+            const call: RecordedCall = { kind: 'signedUrls', target: bucket, args: { paths, expiresIn }, ops: [] }
+            calls.push(call)
+            return respond(call)
+          },
+          async remove(paths: string[]) {
+            const call: RecordedCall = { kind: 'remove', target: bucket, args: { paths }, ops: [] }
+            calls.push(call)
+            return respond(call)
+          },
+          async download(path: string) {
+            const call: RecordedCall = { kind: 'download', target: bucket, args: { path }, ops: [] }
             calls.push(call)
             return respond(call)
           },

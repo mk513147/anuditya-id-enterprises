@@ -14,9 +14,9 @@ import { useRouteTitle } from './routeHandle'
 
 function AdminBrand() {
   return (
-    <div className="flex flex-col gap-1">
-      <Logo variant="light" showTagline={false} />
-      <p className="pl-[3.125rem] text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-400">Admin Panel</p>
+    <div className="flex flex-col items-start gap-2">
+      <Logo variant="compact" plate className="h-8" />
+      <p className="pl-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-gold-400">Admin Panel</p>
     </div>
   )
 }

@@ -1,3 +1,4 @@
+import { forEachLimit } from '@/lib/concurrency'
 import { delay } from '@/lib/delay'
 import { localDateISO } from '@/lib/format'
 import { STUDENT_APPROVAL_STATUSES, type Student, type StudentEditInput } from '@/types'
@@ -163,6 +164,21 @@ export const mockStudentRepository: StudentRepository = {
     student.reviewedAt = decision === 'pending' ? undefined : now
     student.updatedAt = now
     return { ...student }
+  },
+
+  async downloadPhotos(ids, { concurrency, signal, onPhoto }) {
+    // Demo data keeps a photo only for submissions made in this page session (a browser object URL).
+    const byId = new Map(db.students.map((s) => [s.id, s.photoUrl]))
+    await forEachLimit(ids, concurrency, async (id) => {
+      const url = byId.get(id)
+      if (!url || !url.startsWith('blob:')) return onPhoto(id, { status: 'missing' })
+      try {
+        const res = await fetch(url)
+        onPhoto(id, res.ok ? { status: 'ok', blob: await res.blob() } : { status: 'failed' })
+      } catch {
+        onPhoto(id, { status: 'failed' })
+      }
+    }, signal)
   },
 
   async exportRows(params = {}) {

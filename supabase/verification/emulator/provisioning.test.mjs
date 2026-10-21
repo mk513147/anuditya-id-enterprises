@@ -73,7 +73,7 @@ await scenario('01 clean state, no UID supplied', async () => {
   ok('no row FAILs', !rows.some((r) => r.result === 'FAIL'), JSON.stringify(rows.filter((r) => r.result === 'FAIL')))
   ok('user-specific rows are INCONCLUSIVE, not PASS', [12, 13, 14, 15, 16, 17, 18, 19].every((n) => row(rows, n).result === 'INCONCLUSIVE'))
   ok('OVERALL is INCONCLUSIVE', overall(rows) === 'INCONCLUSIVE')
-  ok('14 migration versions match', row(rows, 2).result === 'PASS')
+  ok('15 migration versions match', row(rows, 2).result === 'PASS')
 })
 await scenario('01 everything correct and the user supplied', async () => {
   await addUser(ADMIN)

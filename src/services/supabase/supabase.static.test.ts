@@ -48,7 +48,7 @@ describe('the browser calls only real database functions, with their real parame
       new Set([
         'admin_summary', 'list_active_schools', 'resolve_school', 'submit_student', 'admin_review_student', 'track_order', 'admin_create_order',
         'admin_rotate_tracking_code', 'admin_set_order_status', 'list_enabled_services', 'list_published_advertisements', 'list_approved_feedback',
-        'submit_feedback', 'submit_school_file', 'admin_review_file',
+        'submit_feedback', 'submit_school_file', 'admin_review_file', 'admin_register_school_image', 'admin_set_primary_school_image',
       ]),
     )
   })
@@ -74,11 +74,11 @@ describe('database access stays in the data layer and names its columns', () => 
   })
 
   it('reads only the application tables, and never profiles from the data layer', () => {
-    const allowed = new Set(['schools', 'students', 'orders', 'order_status_history', 'uploaded_files', 'uploaded_file_reviews', 'services', 'advertisements', 'feedback'])
+    const allowed = new Set(['schools', 'students', 'orders', 'order_status_history', 'uploaded_files', 'uploaded_file_reviews', 'school_images', 'services', 'advertisements', 'feedback'])
     for (const f of appFiles.filter((x) => rel(x).startsWith('src/services/supabase/'))) {
       for (const m of code(f).matchAll(/\.from\(\s*'(\w[\w-]*)'\s*\)/g)) {
         // storage.from('<bucket>') uses the same method name
-        if (m[1] === 'student-photos' || m[1] === 'school-uploads') continue
+        if (m[1] === 'student-photos' || m[1] === 'school-uploads' || m[1] === 'school-images') continue
         expect(allowed.has(m[1]), `${rel(f)} reads ${m[1]}`).toBe(true)
       }
     }

@@ -19,6 +19,21 @@ export interface School {
   updatedAt: ISODate
 }
 
+/** An image of a school (administrator only). Stored privately; `url` is a short-lived link for showing it. */
+export interface SchoolImage {
+  id: ID
+  schoolId: ID
+  originalName: string
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp'
+  sizeBytes: number
+  altText?: string
+  isPrimary: boolean
+  displayOrder: number
+  createdAt: ISODate
+  /** Short-lived preview link (a few minutes). Never stored or logged. */
+  url: string
+}
+
 /** Editable school fields (everything the admin form controls). */
 export type SchoolInput = Pick<School, 'name' | 'slug' | 'code' | 'contactPerson' | 'phone' | 'email' | 'address'>
 

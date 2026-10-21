@@ -1,7 +1,7 @@
 -- Spreadsheets and photos live in PRIVATE buckets: no anonymous read or download, administrator-only access, and file
 -- records never imply that contents exist. (service_role stands for the trusted server code of Phase B.)
 begin;
-select plan(36);
+select plan(38);
 
 insert into auth.users (id, email) values
   ('a0000000-0000-0000-0000-000000000001', 'admin@example.invalid'),
@@ -21,8 +21,12 @@ select is((select 'text/csv' = any (allowed_mime_types) and 'application/vnd.ope
 select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and ('anon' = any (roles) or 'public' = any (roles))),
   array['INSERT', 'INSERT'],
   'anon has only the two insert-only upload policies (Phase 3): no anon SELECT, UPDATE or DELETE on storage');
-select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects'), array['INSERT', 'INSERT', 'SELECT'],
-  'storage policies: two insert-only upload policies and the administrator read policy; no client update or delete');
+select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) not like '%school-images%'), array['INSERT', 'INSERT', 'SELECT'],
+  'for the student-photo and spreadsheet buckets: two insert-only upload policies and the administrator read policy; no client update or delete');
+select is((select array_agg(cmd order by cmd) from pg_policies where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) like '%school-images%'),
+  array['DELETE', 'INSERT', 'SELECT'], 'the school-image bucket (migration 20261014090001) has administrator-only insert, read and orphan-only delete');
+select is((select bool_and(roles = array['authenticated']::name[] and (coalesce(qual, '') || coalesce(with_check, '')) ~ 'is_admin') from pg_policies
+  where schemaname = 'storage' and tablename = 'objects' and (coalesce(qual, '') || coalesce(with_check, '')) like '%school-images%'), true, 'and every school-image policy requires the administrator');
 
 -- Objects, as the trusted server would have written them (service_role bypasses RLS) -----------------------------------------------------------
 set local role service_role;

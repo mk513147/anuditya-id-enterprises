@@ -1,31 +1,66 @@
-import { IdCard } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { BUSINESS } from '@/lib/business'
+import { LOGO_ASSETS, LOGO_NAME } from '@/lib/logo'
 import { cn } from '@/lib/utils'
 
+/**
+ * full: symbol, wordmark and tagline (where there is room for the tagline to be read).
+ * compact: symbol and wordmark (narrow headers, sidebars, menus).
+ * symbol: the red "A" only (tiny spaces).
+ * responsive: compact below the `xl` breakpoint, full from `xl` up (the main site header).
+ */
+export type LogoVariant = keyof typeof LOGO_ASSETS | 'responsive'
+
 interface LogoProps {
-  variant?: 'dark' | 'light'
+  variant?: LogoVariant
+  /** Size the image with a height class (e.g. "h-10"); the width follows from the aspect ratio. */
   className?: string
-  showTagline?: boolean
+  /**
+   * Text alternative. Defaults to the logo's name. Ignored when the logo is a link: the link carries the name instead,
+   * so screen readers do not hear it twice.
+   */
+  alt?: string
+  /** Wraps the logo in a link (default: the home page). `null` renders the image only. */
+  to?: string | null
+  /** Link label (only with `to`). */
+  linkLabel?: string
+  /**
+   * Places the logo on a white plate. Use it on dark surfaces: the charcoal "ID Solutions" is not legible on navy, and the
+   * official colours are never changed to compensate.
+   */
+  plate?: boolean
 }
 
-export function Logo({ variant = 'dark', className, showTagline = true }: LogoProps) {
-  const light = variant === 'light'
+const DEFAULT_HEIGHT: Record<LogoVariant, string> = {
+  full: 'h-12',
+  compact: 'h-9',
+  symbol: 'h-8',
+  responsive: 'h-9 xl:h-[52px]',
+}
+
+function LogoImage({ variant, className, alt }: { variant: LogoVariant; className?: string; alt: string }) {
+  const cls = cn('block w-auto max-w-full select-none', DEFAULT_HEIGHT[variant], className)
+  if (variant === 'responsive') {
+    const { full, compact } = LOGO_ASSETS
+    return (
+      <picture className="contents">
+        <source media="(min-width: 1280px)" srcSet={full.src} width={full.width} height={full.height} />
+        <img src={compact.src} width={compact.width} height={compact.height} alt={alt} className={cls} draggable={false} decoding="async" />
+      </picture>
+    )
+  }
+  const a = LOGO_ASSETS[variant]
+  return <img src={a.src} width={a.width} height={a.height} alt={alt} className={cls} draggable={false} decoding="async" />
+}
+
+/** The one place the brand logo is rendered. */
+export function Logo({ variant = 'compact', className, alt = LOGO_NAME, to = '/', linkLabel = `${LOGO_NAME} – home`, plate = false }: LogoProps) {
+  const wrap = cn('inline-flex shrink-0 items-center', plate && 'rounded-xl bg-white px-3 py-2 shadow-sm')
+  // Inside a labelled link the image is decorative (alt=""), so the name is announced once.
+  const image = <LogoImage variant={variant} className={className} alt={to === null ? alt : ''} />
+  if (to === null) return <span className={wrap}>{image}</span>
   return (
-    <Link to="/" aria-label={`${BUSINESS.name} – home`} className={cn('flex items-center gap-2.5', className)}>
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-royal-600 to-navy-900 text-gold-400 shadow-md">
-        <IdCard className="size-5" aria-hidden />
-      </span>
-      <span className="flex min-w-0 flex-col leading-tight">
-        <span className={cn('font-display text-[15px] font-extrabold tracking-tight sm:text-base', light ? 'text-white' : 'text-navy-900')}>
-          {BUSINESS.name}
-        </span>
-        {showTagline && (
-          <span className={cn('hidden text-[11px] font-medium min-[380px]:block', light ? 'text-gold-400' : 'text-gold-700')}>
-            {BUSINESS.tagline}
-          </span>
-        )}
-      </span>
+    <Link to={to} aria-label={linkLabel} className={cn(wrap, 'rounded-lg focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50')}>
+      {image}
     </Link>
   )
 }

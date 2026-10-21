@@ -26,6 +26,8 @@ export type RepositoryErrorCode =
   | 'network'
   /** The record has no stored file (a metadata-only record), so there is nothing to download or show. */
   | 'not_stored'
+  /** This school already has this exact image. */
+  | 'duplicate_image'
   /** Anything the data layer could not classify. The message is generic: raw server details are never shown. */
   | 'unknown'
 

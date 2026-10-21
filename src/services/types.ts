@@ -1,5 +1,5 @@
 import type { AdVisibility } from '@/lib/advertisements'
-import type { FileReviewEvent, FileReviewStatus, SchoolFileSubmission, Advertisement, ServiceCategory, ServiceInput, AdvertisementInput, FeedbackStatus, OrderInput, OrderStatus, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, UploadedFile, UploadedFileType, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
+import type { FileReviewEvent, FileReviewStatus, SchoolFileSubmission, SchoolImage, Advertisement, ServiceCategory, ServiceInput, AdvertisementInput, FeedbackStatus, OrderInput, OrderStatus, FeedbackInput, FeedbackSubmissionResult, FileUploadResult, Feedback, UploadedFile, UploadedFileType, ID, PublicOrder, Order, PagedResult, School, SchoolInput, Service, Student, StudentApprovalStatus, StudentEditInput, StudentSubmission, StudentSubmissionResult } from '@/types'
 
 /**
  * Repository contracts. The UI depends only on these interfaces. Two implementations exist: `services/supabase/*`
@@ -246,6 +246,20 @@ export interface StudentRepository {
    * Capped at STUDENT_EXPORT_LIMIT rows; `truncated` says when the cap was hit.
    */
   exportRows(params?: StudentListParams): Promise<{ rows: AdminStudent[]; truncated: boolean }>
+  /**
+   * Downloads the photographs of the given students for an administrator export, at most `concurrency` at a time,
+   * reporting each one through `onPhoto` (also for students with no photo). Storage paths and links never leave the
+   * repository. Stops starting new downloads when `signal` is aborted. Rejects only if the photo records cannot be read.
+   */
+  downloadPhotos(ids: ID[], options: PhotoDownloadOptions): Promise<void>
+}
+
+export type StudentPhotoResult = { status: 'ok'; blob: Blob } | { status: 'missing' } | { status: 'failed' }
+
+export interface PhotoDownloadOptions {
+  concurrency: number
+  signal?: AbortSignal
+  onPhoto: (id: ID, result: StudentPhotoResult) => void
 }
 
 /** Upper bound on one export, so a single click cannot pull an unbounded amount of personal data. */
@@ -347,6 +361,17 @@ export interface SchoolRepository {
   /** Rejects with RepositoryError('not_found' | 'duplicate_code' | 'duplicate_slug'). */
   update(id: ID, input: SchoolInput): Promise<School>
   setActive(id: ID, isActive: boolean): Promise<School>
+  /** The school's images, primary first then in display order, each with a short-lived preview link. Administrator only. */
+  listImages(schoolId: ID): Promise<SchoolImage[]>
+  /**
+   * Uploads ONE validated image for the school and registers it (the first image of a school becomes its primary image;
+   * later ones never replace it). Rejects 'invalid_input' (file problems), 'duplicate_image' (already added),
+   * 'not_found' (unknown school), 'permission_denied' or a transport error. Storage and the database are separate: if the
+   * registration fails after the upload, the uploaded object is removed again where possible.
+   */
+  uploadImage(schoolId: ID, file: File, options?: { altText?: string }): Promise<SchoolImage>
+  /** Makes an image the school's primary image (the previous one stays, as a normal image). Rejects 'not_found' | 'no_change'. */
+  setPrimaryImage(imageId: ID): Promise<void>
 }
 
 export interface DashboardCounts {

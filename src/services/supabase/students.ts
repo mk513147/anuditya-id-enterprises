@@ -1,9 +1,10 @@
+import { forEachLimit } from '@/lib/concurrency'
 import { STUDENT_APPROVAL_STATUSES, type StudentEditInput } from '@/types'
 import { RepositoryError } from '../errors'
 import { STUDENT_EXPORT_LIMIT, type StudentListParams, type StudentRepository } from '../types'
 import { ORDER_COLUMNS, STUDENT_WITH_SCHOOL, toAdminStudent, toOrder, toStudent, type OrderRow, type StudentRow } from './rows'
 import { fetchSummary } from './summary'
-import { fetchPage, guarded, ilikeAny, localDayBounds, requireClient, requireId, searchTerm, toRepositoryError, unwrap, type Client } from './shared'
+import { fetchPage, guarded, ilikeAny, isUuid, localDayBounds, requireClient, requireId, searchTerm, toRepositoryError, unwrap, type Client } from './shared'
 
 const PHOTO_BUCKET = 'student-photos'
 /** How long a photo link shown on the student page stays valid. Short: it is a picture of a minor. */
@@ -191,6 +192,34 @@ export function createSupabaseStudentRepository(client: Client | null): StudentR
         if (data.length < batch) break
       }
       return { rows: rows.slice(0, STUDENT_EXPORT_LIMIT).map(toAdminStudent), truncated: rows.length > STUDENT_EXPORT_LIMIT }
+    },
+
+    async downloadPhotos(ids, { concurrency, signal, onPhoto }) {
+      const c = requireClient(client)
+      // 1. Which students have a photo, read in chunks (administrator only by RLS). Paths stay inside this function.
+      const paths = new Map<string, string>()
+      const valid = [...new Set(ids.filter(isUuid))]
+      for (let i = 0; i < valid.length; i += 100) {
+        const chunk = valid.slice(i, i + 100)
+        const rows = unwrap(await guarded(() => Promise.resolve(c.from('students').select('id, photo_path').in('id', chunk)))) as { id: string; photo_path: string | null }[]
+        for (const r of rows) if (r.photo_path) paths.set(r.id, r.photo_path)
+      }
+      // 2. Download each photo with the administrator's own session (the bucket's administrator read policy); no signed
+      //    URL is created, so there is no link that could leak. Each result is tied to the id it was requested for.
+      await forEachLimit(ids, concurrency, async (id) => {
+        const path = paths.get(id)
+        if (!path) return onPhoto(id, { status: 'missing' })
+        try {
+          const { data, error } = await c.storage.from(PHOTO_BUCKET).download(path)
+          if (error || !data) {
+            const notFound = /not.?found|404/i.test(`${(error as { statusCode?: string } | null)?.statusCode ?? ''} ${error?.message ?? ''}`)
+            return onPhoto(id, { status: notFound ? 'missing' : 'failed' })
+          }
+          onPhoto(id, { status: 'ok', blob: data })
+        } catch {
+          onPhoto(id, { status: 'failed' })
+        }
+      }, signal)
     },
   }
 }

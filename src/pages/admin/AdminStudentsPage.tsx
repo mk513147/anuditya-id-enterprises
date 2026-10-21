@@ -1,4 +1,4 @@
-import { Download, Loader2 } from 'lucide-react'
+import { FileArchive, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -13,12 +13,14 @@ import { StudentArchiveDialog } from '@/features/students/admin/StudentArchiveDi
 import { StudentEditDialog } from '@/features/students/admin/StudentEditDialog'
 import { StudentFilters } from '@/features/students/admin/StudentFilters'
 import { StudentRowActions } from '@/features/students/admin/StudentRowActions'
-import { studentExportFilename, studentsCsv } from '@/features/students/admin/studentExport'
+import { StudentPhotoExportDialog } from '@/features/students/admin/StudentPhotoExportDialog'
+import { studentExportFilename, studentsWorkbook } from '@/features/students/admin/studentExport'
 import { toListParams, useStudentFilters } from '@/features/students/admin/useStudentFilters'
 import { useAdminStudents, useExportStudents, useRestoreStudent, useStudentFilterOptions } from '@/features/students/hooks'
 import { usePageTitle } from '@/hooks/usePageTitle'
-import { downloadText } from '@/lib/csv'
+import { downloadBlob } from '@/lib/download'
 import { formatDate } from '@/lib/format'
+import { workbookBlob } from '@/lib/xlsx'
 import { describeError } from '@/services/errors'
 import type { AdminStudent } from '@/services/types'
 import type { Student } from '@/types'
@@ -35,23 +37,30 @@ export function AdminStudentsPage() {
   const [editing, setEditing] = useState<AdminStudent | null>(null)
   const [archiving, setArchiving] = useState<Student | null>(null)
   const exporter = useExportStudents()
+  const [building, setBuilding] = useState(false)
+  const [photoExportOpen, setPhotoExportOpen] = useState(false)
 
-  /** Exports every student matching the current filters (all pages), with an explicit column list. */
-  const exportCsv = async () => {
+  /** Exports every student matching the current filters (all pages) as an Excel workbook, with an explicit column list. */
+  const exportExcel = async () => {
+    if (building) return
     try {
       const { rows, truncated } = await exporter.mutateAsync({ ...toListParams(filters), page: undefined, pageSize: undefined })
       if (rows.length === 0) {
         toast.info('Nothing to export', { description: 'No students match the current filters.' })
         return
       }
-      downloadText(studentExportFilename(), studentsCsv(rows))
+      setBuilding(true)
+      downloadBlob(studentExportFilename(), workbookBlob(await studentsWorkbook(rows)))
       toast.success(`Exported ${rows.length} ${rows.length === 1 ? 'student' : 'students'}`, {
         description: truncated ? 'The export limit was reached: narrow the filters to export the rest.' : 'The file is in your downloads. It contains personal data: store it securely.',
       })
     } catch (e) {
-      toast.error(describeError(e, 'Could not export the students. Please try again.'))
+      toast.error(describeError(e, 'Could not create the Excel file. Please try again.'))
+    } finally {
+      setBuilding(false)
     }
   }
+  const exportBusy = exporter.isPending || building
 
   const columns: Column<AdminStudent>[] = [
     {
@@ -112,10 +121,15 @@ export function AdminStudentsPage() {
           )
         }
         actions={
-          <Button size="lg" variant="outline" onClick={() => void exportCsv()} disabled={exporter.isPending || !data || data.total === 0}>
-            {exporter.isPending ? <Loader2 className="animate-spin" aria-hidden /> : <Download aria-hidden />}
-            Export CSV
-          </Button>
+          <>
+            <Button size="lg" variant="outline" onClick={() => void exportExcel()} disabled={exportBusy || !data || data.total === 0} title="All students matching the current filters, as an Excel workbook">
+              {exportBusy ? <Loader2 className="animate-spin" aria-hidden /> : <FileSpreadsheet aria-hidden />}
+              Export Excel
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => setPhotoExportOpen(true)} disabled={!data || data.total === 0} title="All students matching the current filters, with their photographs (.zip)">
+              <FileArchive aria-hidden /> Export with photos
+            </Button>
+          </>
         }
       />
 
@@ -172,6 +186,7 @@ export function AdminStudentsPage() {
 
       <StudentEditDialog student={editing} onClose={() => setEditing(null)} />
       <StudentArchiveDialog student={archiving} onClose={() => setArchiving(null)} />
+      <StudentPhotoExportDialog open={photoExportOpen} onOpenChange={setPhotoExportOpen} params={toListParams(filters)} matching={data?.total ?? 0} />
     </>
   )
 }

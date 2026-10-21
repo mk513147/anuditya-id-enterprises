@@ -43,6 +43,7 @@ const GENERIC: Record<RepositoryErrorCode, string> = {
   permission_denied: 'You do not have permission to do that, or your session has expired. Please sign in again.',
   network: 'Could not reach the server. Check your connection and try again.',
   not_stored: 'There is no stored copy of this file.',
+  duplicate_image: 'This image has already been added to this school.',
   unknown: 'Something went wrong. Please try again.',
 }
 

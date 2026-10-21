@@ -18,7 +18,7 @@ export function SiteFooter() {
     <footer id="contact" className="bg-navy-950 text-white/80">
       <div className="container-page grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-3 lg:py-16">
         <div className="space-y-4">
-          <Logo variant="light" />
+          <Logo variant="full" plate className="h-14" />
           <p className="max-w-xs text-sm leading-relaxed">
             ID cards, lanyards, school diaries, magazines and printing — for schools, colleges and organisations.
           </p>

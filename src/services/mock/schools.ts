@@ -1,6 +1,7 @@
 import { delay } from '@/lib/delay'
 import { nextFreeSlug } from '@/lib/slug'
 import type { School, SchoolInput } from '@/types'
+import { inspectImage } from '@/validations/schoolImage'
 import { RepositoryError } from '../errors'
 import type { SchoolRepository } from '../types'
 import { db } from './db'
@@ -25,6 +26,9 @@ function assertUnique(input: SchoolInput, exceptId?: string) {
     throw new RepositoryError('duplicate_slug', `The link name "${input.slug}" is already used by another school.`, nextFreeSlug(input.slug, others.map((s) => s.slug)))
   }
 }
+
+/** Prototype hook: an image file whose name contains this fails to upload (to try partial batches and retry). */
+export const MOCK_IMAGE_FAILURE_TOKEN = 'FAIL'
 
 const find = (id: string) => {
   const school = db.schools.find((s) => s.id === id)
@@ -88,6 +92,50 @@ export const mockSchoolRepository: SchoolRepository = {
     // Keep denormalised display names on this school's orders in step.
     db.orders.filter((o) => o.schoolId === id).forEach((o) => (o.customer = school.name))
     return { ...school }
+  },
+
+  async listImages(schoolId) {
+    await delay(200)
+    find(schoolId)
+    return db.schoolImages
+      .filter((i) => i.schoolId === schoolId)
+      .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || a.displayOrder - b.displayOrder)
+      .map(({ sha256: _sha256, ...i }) => ({ ...i }))
+  },
+
+  async uploadImage(schoolId, file, { altText } = {}) {
+    const check = await inspectImage(file)
+    if (!check.ok) throw new RepositoryError('invalid_input', check.message, undefined, { file: check.message })
+    find(schoolId)
+    await delay(400)
+    // Prototype hook: an image whose name contains "FAIL" fails like a dropped connection (to try partial batches and retry).
+    if (file.name.toUpperCase().includes(MOCK_IMAGE_FAILURE_TOKEN)) throw new Error('Mock upload failure')
+    const mine = db.schoolImages.filter((i) => i.schoolId === schoolId)
+    if (mine.some((i) => i.sha256 === check.sha256)) throw new RepositoryError('duplicate_image', 'This image has already been added to this school.')
+    const image = {
+      id: crypto.randomUUID(),
+      schoolId,
+      originalName: file.name,
+      mimeType: check.type.mime,
+      sizeBytes: file.size,
+      altText: altText?.trim() || undefined,
+      isPrimary: !mine.some((i) => i.isPrimary),
+      displayOrder: Math.max(-1, ...mine.map((i) => i.displayOrder)) + 1,
+      createdAt: new Date().toISOString(),
+      url: typeof URL.createObjectURL === 'function' ? URL.createObjectURL(file) : '',
+      sha256: check.sha256,
+    }
+    db.schoolImages.push(image)
+    const { sha256: _sha256, ...out } = image
+    return { ...out }
+  },
+
+  async setPrimaryImage(imageId) {
+    await delay(250)
+    const image = db.schoolImages.find((i) => i.id === imageId)
+    if (!image) throw new RepositoryError('not_found', 'Image not found.')
+    if (image.isPrimary) throw new RepositoryError('no_change', 'This is already the primary image.')
+    for (const i of db.schoolImages) if (i.schoolId === image.schoolId) i.isPrimary = i.id === imageId
   },
 
   async setActive(id, isActive) {
